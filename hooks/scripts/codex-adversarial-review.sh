@@ -16,14 +16,6 @@ REVIEW_ROUND="${ADVERSARIAL_REVIEW_ROUND:-0}"
 PREVIOUS_ISSUES="${ADVERSARIAL_PREVIOUS_ISSUES:-}"
 DIFF_NOTE=""
 PREVIOUS_REVIEW_CONTEXT=""
-BASELINE_ERROR_REASON="session-base-commit missing or invalid; cannot verify diff baseline"
-
-baseline_error_json() {
-  local summary="$1"
-  jq -cn \
-    --arg summary "$summary" \
-    '{"status":"ERROR","summary":$summary,"blocking_issues":[$summary],"fix_instructions":["Record a valid .claude/session-base-commit before rerunning the review"]}'
-}
 
 # Fallback: if unstaged diff is empty, check session-base-commit for committed changes
 if [[ -z "$DIFF" ]]; then
@@ -34,12 +26,9 @@ if [[ -z "$DIFF" ]]; then
       DIFF="$(git diff "$BASE_COMMIT"...HEAD 2>/dev/null || true)"
       DIFF_STAT="$(git diff --stat "$BASE_COMMIT"...HEAD 2>/dev/null || true)"
     else
-      baseline_error_json "$BASELINE_ERROR_REASON" | tee "$OUT_FILE"
+      echo '{"status":"ERROR","summary":"session-base-commit contains invalid ref","blocking_issues":["Invalid baseline ref"],"fix_instructions":["Run session-start.sh to record a valid base commit"]}' | tee "$OUT_FILE"
       exit 0
     fi
-  else
-    baseline_error_json "$BASELINE_ERROR_REASON" | tee "$OUT_FILE"
-    exit 0
   fi
 fi
 

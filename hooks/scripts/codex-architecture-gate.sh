@@ -80,10 +80,9 @@ fi
 
 DIFF_FILES="$(git diff --name-only HEAD 2>/dev/null || true)"
 DIFF_TEXT="$(git diff HEAD 2>/dev/null || true)"
-BASELINE_ERROR_REASON="Architecture gate: ERROR. session-base-commit missing or invalid; cannot verify diff baseline"
 
 # Fallback: if unstaged diff is empty, check session-base-commit for committed changes
-if [[ -z "$DIFF_FILES" && -z "$DIFF_TEXT" ]]; then
+if [[ -z "$DIFF_FILES" || -z "$DIFF_TEXT" ]]; then
   BASE_COMMIT_FILE="$STATE_DIR/session-base-commit"
   if [[ -f "$BASE_COMMIT_FILE" ]]; then
     BASE_COMMIT="$(cat "$BASE_COMMIT_FILE")"
@@ -91,12 +90,9 @@ if [[ -z "$DIFF_FILES" && -z "$DIFF_TEXT" ]]; then
       DIFF_FILES="$(git diff --name-only "$BASE_COMMIT"...HEAD 2>/dev/null || true)"
       DIFF_TEXT="$(git diff "$BASE_COMMIT"...HEAD 2>/dev/null || true)"
     else
-      json_block "$BASELINE_ERROR_REASON"
+      json_block "Architecture gate: ERROR. session-base-commit contains invalid ref; cannot verify diff baseline"
       exit 0
     fi
-  else
-    json_block "$BASELINE_ERROR_REASON"
-    exit 0
   fi
 fi
 

@@ -34,10 +34,10 @@ TEST1_DIR="$TMPDIR_BASE/missing"
 make_repo "$TEST1_DIR"
 rm -f "$TEST1_DIR/.claude/session-base-commit"
 OUTPUT="$(run_gate "$TEST1_DIR" 2>&1 || true)"
-if printf '%s' "$OUTPUT" | grep -Eq 'FAIL|ERROR'; then
-  echo "PASS: missing session-base-commit blocks the architecture gate"
+if [[ -z "$OUTPUT" ]] || ! printf '%s' "$OUTPUT" | grep -Eq 'FAIL|ERROR|BLOCK'; then
+  echo "PASS: missing session-base-commit does not block the architecture gate"
 else
-  echo "FAIL: missing session-base-commit did not block the architecture gate"
+  echo "FAIL: missing session-base-commit blocked the architecture gate"
   printf '%s\n' "$OUTPUT"
   exit 1
 fi
