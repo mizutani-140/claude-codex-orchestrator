@@ -3,5 +3,7 @@
 .claude/last-plan-critique.json
 .claude/last-implementation-result.json
 .claude/last-adversarial-review.json
+.claude/sessions/
+.claude/current-session
 node_modules/
 dist/
