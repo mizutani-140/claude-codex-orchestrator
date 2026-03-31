@@ -64,6 +64,16 @@ describe("taskmd CLI", () => {
     expect(runCli(["--file", filePath, "list"])).toBe("1. [x] Buy milk\n");
   });
 
+  it("prints task counts", async () => {
+    const filePath = await createTempFilePath();
+
+    runCli(["--file", filePath, "add", "Buy milk"]);
+    runCli(["--file", filePath, "add", "Call mom"]);
+    runCli(["--file", filePath, "done", "1"]);
+
+    expect(runCli(["--file", filePath, "count"])).toBe("Total: 2, Done: 1, Pending: 1\n");
+  });
+
   it("deletes a task", async () => {
     const filePath = await createTempFilePath();
 

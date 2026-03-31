@@ -61,6 +61,17 @@ program
   });
 
 program
+  .command("count")
+  .action(async function (this: Command) {
+    const filePath = resolveFilePath();
+    const tasks = await loadTasks(filePath);
+    const doneCount = tasks.filter((task) => task.done).length;
+    const pendingCount = tasks.length - doneCount;
+
+    console.log(`Total: ${tasks.length}, Done: ${doneCount}, Pending: ${pendingCount}`);
+  });
+
+program
   .command("done")
   .argument("<index>")
   .action(async function (this: Command, indexText) {
