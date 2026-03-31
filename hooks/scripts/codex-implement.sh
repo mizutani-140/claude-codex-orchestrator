@@ -6,14 +6,14 @@ OUT_FILE="$PROJECT_DIR/.claude/last-implementation-result.json"
 mkdir -p "$PROJECT_DIR/.claude"
 
 if ! command -v codex >/dev/null 2>&1; then
-  echo '{"status":"ERROR","summary":"codex command not found","changed_files":[],"tests_run":[],"tests_status":"NOT_RUN","remaining_risks":["Codex CLI missing"]}' | tee "$OUT_FILE"
+  echo '{"status":"ERROR","summary":"codex command not found","changed_files":[],"tests_run":[],"tests_status":"NOT_RUN","test_log":"","remaining_risks":["Codex CLI missing"]}' | tee "$OUT_FILE"
   exit 0
 fi
 
 TASK_TEXT="$(cat)"
 
 if [[ -z "${TASK_TEXT// }" ]]; then
-  echo '{"status":"ERROR","summary":"implementation task is empty","changed_files":[],"tests_run":[],"tests_status":"NOT_RUN","remaining_risks":["Empty task"]}' | tee "$OUT_FILE"
+  echo '{"status":"ERROR","summary":"implementation task is empty","changed_files":[],"tests_run":[],"tests_status":"NOT_RUN","test_log":"","remaining_risks":["Empty task"]}' | tee "$OUT_FILE"
   exit 0
 fi
 
@@ -30,7 +30,7 @@ error_result_json() {
   local summary="$1"
   jq -cn \
     --arg summary "$summary" \
-    '{"status":"ERROR","summary":$summary,"changed_files":[],"tests_run":[],"tests_status":"NOT_RUN","remaining_risks":["Codex delegation failed"]}'
+    '{"status":"ERROR","summary":$summary,"changed_files":[],"tests_run":[],"tests_status":"NOT_RUN","test_log":"","remaining_risks":["Codex delegation failed"]}'
 }
 
 stderr_indicates_output_last_message_unsupported() {
@@ -69,12 +69,25 @@ Requirements:
 - if tests cannot be run, say why
 - if requirements conflict, prioritize safety and correctness
 
+TDD WORKFLOW (mandatory for new features, recommended for bug fixes):
+1. RED: Write or update a failing test that captures the requirement. Run it. Confirm it FAILS.
+2. GREEN: Write the minimal code to make the test pass. Run it. Confirm it PASSES.
+3. REFACTOR: Clean up if needed, re-run tests to ensure they still pass.
+- You MUST include RED phase test output (showing failure) in test_log.
+- Skipping the RED phase is unacceptable for new features.
+
+BOUNDARY TESTS:
+If .claude/last-sprint-contract.json exists, read it and run any boundary_tests_required.
+Boundary test types: contract-test, integration-test, api-contract-test, security-regression-test, smoke-test.
+
 CRITICAL CONSTRAINTS:
 - You MUST run tests before reporting status as DONE.
 - If tests fail or cannot be run, status MUST be PARTIAL, never DONE.
-- After successful implementation and tests, run: git add <changed_files> && git commit -m "<descriptive message about what changed and why>"
+- Do NOT run git add or git commit. Leave all changes as unstaged modifications. The orchestrator will handle staging and committing after gate review passes. Running git add or git commit is unacceptable.
 - It is unacceptable to report tests_status as PASS without actually executing tests.
 - It is unacceptable to remove or weaken existing test assertions to make tests pass.
+- You MUST capture test output (stdout+stderr) and include the first 200 lines in the test_log field.
+- The test_log must contain actual test runner output, not a summary. If output exceeds 200 lines, truncate and append "[TRUNCATED]".
 
 Return JSON only. No markdown fences. Use exactly this schema:
 
@@ -84,6 +97,7 @@ Return JSON only. No markdown fences. Use exactly this schema:
   "changed_files": ["path1", "path2"],
   "tests_run": ["cmd1", "cmd2"],
   "tests_status": "PASS|FAIL|NOT_RUN",
+  "test_log": "first 200 lines of actual test stdout+stderr including RED phase evidence",
   "remaining_risks": ["..."]
 }
 

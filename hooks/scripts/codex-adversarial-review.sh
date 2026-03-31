@@ -14,9 +14,36 @@ DIFF="$(git diff HEAD 2>/dev/null || true)"
 DIFF_STAT="$(git diff --stat HEAD 2>/dev/null || true)"
 REVIEW_ROUND="${ADVERSARIAL_REVIEW_ROUND:-0}"
 PREVIOUS_ISSUES="${ADVERSARIAL_PREVIOUS_ISSUES:-}"
-DIFF_FOR_REVIEW="$DIFF"
 DIFF_NOTE=""
 PREVIOUS_REVIEW_CONTEXT=""
+BASELINE_ERROR_REASON="session-base-commit missing or invalid; cannot verify diff baseline"
+
+baseline_error_json() {
+  local summary="$1"
+  jq -cn \
+    --arg summary "$summary" \
+    '{"status":"ERROR","summary":$summary,"blocking_issues":[$summary],"fix_instructions":["Record a valid .claude/session-base-commit before rerunning the review"]}'
+}
+
+# Fallback: if unstaged diff is empty, check session-base-commit for committed changes
+if [[ -z "$DIFF" ]]; then
+  BASE_COMMIT_FILE="$PROJECT_DIR/.claude/session-base-commit"
+  if [[ -f "$BASE_COMMIT_FILE" ]]; then
+    BASE_COMMIT="$(cat "$BASE_COMMIT_FILE")"
+    if git rev-parse --verify "${BASE_COMMIT}^{commit}" >/dev/null 2>&1; then
+      DIFF="$(git diff "$BASE_COMMIT"...HEAD 2>/dev/null || true)"
+      DIFF_STAT="$(git diff --stat "$BASE_COMMIT"...HEAD 2>/dev/null || true)"
+    else
+      baseline_error_json "$BASELINE_ERROR_REASON" | tee "$OUT_FILE"
+      exit 0
+    fi
+  else
+    baseline_error_json "$BASELINE_ERROR_REASON" | tee "$OUT_FILE"
+    exit 0
+  fi
+fi
+
+DIFF_FOR_REVIEW="$DIFF"
 
 if [[ -z "$DIFF" ]]; then
   echo '{"status":"PASS","summary":"No diff to review","blocking_issues":[],"fix_instructions":[]}' | tee "$OUT_FILE"

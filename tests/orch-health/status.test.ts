@@ -33,6 +33,7 @@ describe("runStatus", () => {
     const rootDir = createTempRoot();
     writeFile(rootDir, ".claude/last-implementation-result.json", "{\"status\":\"DONE\"}\n");
     writeFile(rootDir, ".claude/last-adversarial-review.json", "{\"status\":\"PASS\"}\n");
+    writeFile(rootDir, ".claude/last-sprint-contract.json", "{\"boundary_tests_required\":[\"smoke-test\"]}\n");
     writeFile(rootDir, ".claude/review-gate-state.json", "{\"last_gate_status\":\"IDLE\"}\n");
 
     const result = runStatus(rootDir);
@@ -50,6 +51,12 @@ describe("runStatus", () => {
           exists: true,
           parseable: true,
           content: { status: "PASS" },
+        }),
+        expect.objectContaining({
+          file: ".claude/last-sprint-contract.json",
+          exists: true,
+          parseable: true,
+          content: { boundary_tests_required: ["smoke-test"] },
         }),
         expect.objectContaining({
           file: ".claude/review-gate-state.json",
@@ -77,6 +84,11 @@ describe("runStatus", () => {
         expect.objectContaining({
           file: ".claude/last-adversarial-review.json",
           exists: true,
+          parseable: false,
+        }),
+        expect.objectContaining({
+          file: ".claude/last-sprint-contract.json",
+          exists: false,
           parseable: false,
         }),
         expect.objectContaining({

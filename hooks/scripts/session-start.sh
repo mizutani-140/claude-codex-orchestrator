@@ -34,6 +34,17 @@ else
 fi
 echo ""
 
+# Record session base commit for gate diff fallback
+BASE_COMMIT="$(git rev-parse HEAD 2>/dev/null || echo "")"
+if [[ -n "$BASE_COMMIT" ]]; then
+  mkdir -p "$PROJECT_DIR/.claude"
+  BASE_COMMIT_TMP="$PROJECT_DIR/.claude/session-base-commit.tmp"
+  printf '%s' "$BASE_COMMIT" > "$BASE_COMMIT_TMP"
+  mv "$BASE_COMMIT_TMP" "$PROJECT_DIR/.claude/session-base-commit"
+  echo "Base commit recorded: ${BASE_COMMIT:0:8}"
+fi
+echo ""
+
 echo "--- Recent Commits ---"
 git log --oneline -5 2>/dev/null || echo "(git log unavailable)"
 echo ""

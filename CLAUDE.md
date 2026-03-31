@@ -35,12 +35,24 @@
 - **It is unacceptable** to work on more than one feature per session. Focus on the highest-priority incomplete item in feature-list.json.
 - **It is unacceptable** to skip reading claude-progress.txt at session start.
 - **It is unacceptable** to end a session without updating claude-progress.txt via session-end.sh.
-- **It is unacceptable** to complete implementation without a descriptive git commit.
+- **It is unacceptable** for Codex to run git commit. Commits are made by the orchestrator after all gates PASS.
 
 ### Feature List Integrity
 - **It is unacceptable** to remove or edit existing test assertions to make tests pass. Fix the implementation instead.
 - **It is unacceptable** to delete features from feature-list.json. Features may only be marked as done.
 - **It is unacceptable** to modify feature-list.json acceptance criteria after implementation begins, unless explicitly approved by the user.
+
+---
+
+### TDD Discipline
+- **It is unacceptable** to implement new features without first writing failing tests (RED phase).
+- **It is unacceptable** to report test_log without evidence of the RED-GREEN-REFACTOR cycle for new features.
+- Bug fixes may use test-after pattern, but new features require TDD.
+
+### Spec-First Development
+- **It is unacceptable** to begin implementation without a spec file at `specs/<feature-id>.md`.
+- Spec files define machine-verifiable acceptance criteria.
+- plan-lead は計画時に spec の存在を確認し、不足があれば作成を指示する。
 
 ---
 
@@ -66,15 +78,21 @@
 - テスト実行
 - adversarial review
 - 修正ループの実作業
-- 各タスク完了後の git commit
+- 変更をファイルに書く（staging / commit は全 gate 通過後に orchestrator が実行）
 
-### 自動 flow
-1. plan-lead が計画を作る（feature-list.json を参照し、target_feature_id を明示）
-2. codex-executor が plan critique を実施する
-3. codex-executor が実装 / テストを実施する
-4. Stop / SubagentStop で architecture gate が走る
-5. gate fail 時は last-adversarial-review.json を参照して Codex に再修正させる
-6. 最大 3 回失敗したら残課題をユーザーへ報告する
+### 自動 flow（7 Layer Development Stack）
+
+`Spec-first -> Sprint contract -> TDD inner loop -> Boundary tests -> Eval gate -> Architecture gate -> Session handoff`
+
+1. **Spec-first**: plan-lead が `specs/<feature-id>.md` を確認し計画を作る
+2. **Sprint contract**: codex-executor が `codex-sprint-contract.sh` で done_criteria / test_plan / boundary_tests_required を合意する
+3. **TDD inner loop**: codex-executor が RED -> GREEN -> REFACTOR サイクルで実装・テストを実施する（commit はしない）
+4. **Boundary tests**: sprint contract で指定された boundary test を実行する
+5. **Eval gate**: Stop / SubagentStop で `codex-eval-gate.sh` が走る（テスト証拠の機械検証。contract 充足検証は将来拡張予定）
+6. **Architecture gate**: eval gate PASS 後、`codex-architecture-gate.sh` が走る（構造・設計リスクを検証）
+7. **Session handoff**: 全 gate PASS 後に orchestrator が commit し、`session-end.sh` で次セッション向け artifact を残す
+8. gate fail 時は `last-adversarial-review.json` / `last-eval-gate.json` を参照して Codex に再修正させる
+9. 最大 3 回失敗したら残課題をユーザーへ報告する
 
 ### Evaluator Calibration
 - adversarial review は独立した skeptical な視点で行う

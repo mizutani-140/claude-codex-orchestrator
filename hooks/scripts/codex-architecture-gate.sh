@@ -80,6 +80,25 @@ fi
 
 DIFF_FILES="$(git diff --name-only HEAD 2>/dev/null || true)"
 DIFF_TEXT="$(git diff HEAD 2>/dev/null || true)"
+BASELINE_ERROR_REASON="Architecture gate: ERROR. session-base-commit missing or invalid; cannot verify diff baseline"
+
+# Fallback: if unstaged diff is empty, check session-base-commit for committed changes
+if [[ -z "$DIFF_FILES" && -z "$DIFF_TEXT" ]]; then
+  BASE_COMMIT_FILE="$STATE_DIR/session-base-commit"
+  if [[ -f "$BASE_COMMIT_FILE" ]]; then
+    BASE_COMMIT="$(cat "$BASE_COMMIT_FILE")"
+    if git rev-parse --verify "${BASE_COMMIT}^{commit}" >/dev/null 2>&1; then
+      DIFF_FILES="$(git diff --name-only "$BASE_COMMIT"...HEAD 2>/dev/null || true)"
+      DIFF_TEXT="$(git diff "$BASE_COMMIT"...HEAD 2>/dev/null || true)"
+    else
+      json_block "$BASELINE_ERROR_REASON"
+      exit 0
+    fi
+  else
+    json_block "$BASELINE_ERROR_REASON"
+    exit 0
+  fi
+fi
 
 if [[ -z "$DIFF_FILES" || -z "$DIFF_TEXT" ]]; then
   reset_state
@@ -87,8 +106,13 @@ if [[ -z "$DIFF_FILES" || -z "$DIFF_TEXT" ]]; then
 fi
 
 CHANGED_COUNT="$(echo "$DIFF_FILES" | sed '/^$/d' | wc -l | tr -d ' ')"
-NEW_FILES="$(git diff --diff-filter=A --name-only HEAD 2>/dev/null | sed '/^$/d' | wc -l | tr -d ' ')"
-INSERTIONS="$(git diff --shortstat HEAD 2>/dev/null | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo "0")"
+# Use the same diff source for all metrics (BASE_COMMIT fallback via DIFF_REF)
+DIFF_REF="HEAD"
+if [[ -n "${BASE_COMMIT:-}" ]]; then
+  DIFF_REF="${BASE_COMMIT}...HEAD"
+fi
+NEW_FILES="$(git diff --diff-filter=A --name-only $DIFF_REF 2>/dev/null | sed '/^$/d' | wc -l | tr -d ' ')"
+INSERTIONS="$(git diff --shortstat $DIFF_REF 2>/dev/null | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo "0")"
 
 ARCH_CHANGE=false
 REASONS=()

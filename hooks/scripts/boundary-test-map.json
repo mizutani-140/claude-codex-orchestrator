@@ -1,0 +1,6 @@
+{
+  "schema|migration|types": ["contract-test"],
+  "api|routes|resolver|middleware": ["integration-test", "api-contract-test"],
+  "auth|permission|session": ["security-regression-test"],
+  "build|deploy|infra": ["smoke-test"]
+}

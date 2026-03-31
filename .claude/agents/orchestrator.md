@@ -43,16 +43,23 @@ initialPrompt: Always delegate implementation, testing, and code review to codex
 - `.claude/`, `.codex/`, `hooks/`, `CLAUDE.md`, `README*`, `docs/`, `.gitignore` の編集
 - オーケストレーション層そのものの調整
 
-## 実装タスクの標準フロー
+## 実装タスクの標準フロー（7 Layer Stack）
 
-1. `plan-lead` に計画を作らせる
+0. spec ファイル確認: `specs/<feature-id>.md` が存在しなければ、plan-lead の計画に基づいて作成する
+1. `plan-lead` に計画を作らせる（spec を参照）
 2. 計画を `codex-executor` 経由で Codex に critique させる
 3. critique を踏まえて計画を確定する
-4. `codex-executor` に実装 / テストを委任する
-5. 結果 JSON を確認する
-6. gate に block された場合は `.claude/last-adversarial-review.json` を読み、修正を `codex-executor` に再委任する
-7. PASS するまで継続する
-8. ループ上限時は未解決課題を整理してユーザーへ報告する
+4. `codex-executor` 経由で sprint contract を生成させる（`codex-sprint-contract.sh`）
+5. `codex-executor` に TDD で実装 / テストを委任する（contract 参照、commit 禁止）
+6. 結果 JSON を確認する:
+   a. `test_log` フィールドが存在し空でないことを確認
+   b. `test_log` 内に最終テスト失敗がないことを確認
+   c. `tests_status` と `test_log` の整合性を検証
+   Note: eval gate は現時点では test_log 存在 + tests_status + 失敗キーワード検査を行う。sprint contract の done_criteria 照合は将来拡張。
+7. gate に block された場合は `.claude/last-eval-gate.json` または `.claude/last-adversarial-review.json` を読み、修正を `codex-executor` に再委任する
+8. 全 gate PASS 後、変更ファイルを `git add` + `git commit` する
+9. PASS するまで継続する
+10. ループ上限時は未解決課題を整理してユーザーへ報告する
 
 ## gate block を受けたときの振る舞い
 

@@ -61,13 +61,30 @@ maxTurns: 20
 - テストが実行できない場合は `status: PARTIAL` とし、理由を `remaining_risks` に記載する
 - テスト未実行で DONE を返した場合、orchestrator はそれを reject する
 
-#### Git Commit Rule
+#### TDD Enforcement
 
-- 実装完了後、Codex に以下を実行させる:
-  - `git add <changed_files>`
-  - `git commit -m "<descriptive message>"`
-- コミットメッセージは変更内容の「why」を含むこと
-- **It is unacceptable** to complete implementation without a git commit
+- 新機能実装時は TDD サイクル（RED → GREEN → REFACTOR）を必須とする
+- `test_log` に RED phase（テスト失敗）の証拠がなければ、orchestrator は reject する可能性がある
+- **It is unacceptable** to write implementation before writing failing tests for new features
+
+#### Test Log Verification
+
+- `test_log` フィールドが空または欠落の場合、`tests_status: PASS` を信用しない
+- orchestrator は `test_log` の内容を読み、PASS/FAIL のキーワードを独自に確認する
+- `test_log` に最終テスト結果で FAIL / Error が含まれている場合、`tests_status` が PASS でも reject する
+
+#### Sprint Contract Reference
+
+- `.claude/last-sprint-contract.json` が存在する場合、`done_criteria` を実装の指針として Codex に渡す
+- `boundary_tests_required` に記載のテスト種別を実行する
+
+#### Git Rule
+
+- Codex は **git add も git commit も実行しない**
+- 変更はファイルに書き込むだけで、unstaged のまま残す
+- staging と commit は全 gate 通過後に orchestrator が行う
+- **It is unacceptable** for Codex to run git add or git commit during implementation
+- unstaged の変更を残すことで、gate が `git diff HEAD` で変更を正しく検出できる
 
 ### C. Adversarial Review
 

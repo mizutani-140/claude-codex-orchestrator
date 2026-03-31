@@ -6,6 +6,7 @@ import type { StatusEntry, StatusSummary } from "./types.js";
 const statusFiles = [
   ".claude/last-implementation-result.json",
   ".claude/last-adversarial-review.json",
+  ".claude/last-sprint-contract.json",
   ".claude/review-gate-state.json",
 ] as const;
 

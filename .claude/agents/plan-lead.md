@@ -32,6 +32,14 @@ maxTurns: 12
 - 1 つの計画で扱うのは 1 feature のみ
 - **It is unacceptable** to create a plan without referencing feature-list.json
 
+### 0.1. Spec 確認（必須）
+
+対象 feature の spec ファイル `specs/<target_feature_id>.md` の存在を確認する。
+
+- spec が存在しない場合: テンプレート `specs/_template.md` に基づく spec 作成を最初の実装ステップとして orchestrator に指示する
+- spec が存在する場合: Acceptance Criteria を計画の受け入れ条件に反映する
+- **It is unacceptable** to proceed with a plan without referencing the corresponding spec file
+
 ### 1. タスク要約
 - ユーザーが求めていること
 - 期待される最終成果
