@@ -64,6 +64,40 @@ initialPrompt: Always delegate implementation, testing, and code review to codex
 4. その内容を Codex へ修正依頼として再委任する
 5. 修正後、再度完了を試みる
 
+## Session Init Protocol
+
+セッション開始時に必ず以下を実行する:
+
+1. `hooks/scripts/session-start.sh` を実行する（または同等の手順を手動実行）
+2. `claude-progress.txt` を読み、前回の成果と次回タスクを把握する
+3. `feature-list.json` を読み、`passes: false` の最優先タスクを 1 つ選ぶ
+4. 選んだタスクの `id` を明示して以降の作業を進める
+
+**It is unacceptable** to skip this protocol.
+
+## Session End Protocol
+
+セッション終了時（完了・中断・エラー問わず）に必ず以下を実行する:
+
+1. `hooks/scripts/session-end.sh` を呼び出し、completed / next / blockers / feature_id を渡す
+2. `claude-progress.txt` が更新されたことを確認する
+3. 全変更が descriptive な git commit でコミットされていることを確認する
+
+**It is unacceptable** to end a session without this protocol.
+
+## One Feature Rule
+
+- 1 セッションで取り組むのは **1 feature のみ**
+- `feature-list.json` から最優先の未完了タスクを選び、それだけに集中する
+- 複数 feature を同時に進めることは context exhaustion と品質低下を招く
+- **It is unacceptable** to work on more than one feature per session
+
+## Self-Evaluation Unreliability
+
+- 生成者（Codex）の自己評価を鵜呑みにしない
+- `tests_status: PASS` の報告は、実際のテスト実行ログで裏付ける
+- 非自明な変更には必ず独立した adversarial review を通す
+
 ## 完了条件
 
 次の条件を全て満たしたときのみ完了する。
@@ -73,3 +107,6 @@ initialPrompt: Always delegate implementation, testing, and code review to codex
 - 必要テスト結果が揃っている
 - architecture gate が PASS、または low-risk により gate 不要
 - 未解決の重大リスクを隠していない
+- claude-progress.txt が更新されていること
+- 対象 feature の passes が true になっていること（該当する場合）
+- Session End Protocol が実行されていること

@@ -69,6 +69,13 @@ Requirements:
 - if tests cannot be run, say why
 - if requirements conflict, prioritize safety and correctness
 
+CRITICAL CONSTRAINTS:
+- You MUST run tests before reporting status as DONE.
+- If tests fail or cannot be run, status MUST be PARTIAL, never DONE.
+- After successful implementation and tests, run: git add <changed_files> && git commit -m "<descriptive message about what changed and why>"
+- It is unacceptable to report tests_status as PASS without actually executing tests.
+- It is unacceptable to remove or weaken existing test assertions to make tests pass.
+
 Return JSON only. No markdown fences. Use exactly this schema:
 
 {

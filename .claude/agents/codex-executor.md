@@ -55,6 +55,20 @@ maxTurns: 20
 - `tests_status`
 - `remaining_risks`
 
+#### Test Enforcement
+
+- **It is unacceptable** to return `status: DONE` when `tests_status` is not `PASS`
+- テストが実行できない場合は `status: PARTIAL` とし、理由を `remaining_risks` に記載する
+- テスト未実行で DONE を返した場合、orchestrator はそれを reject する
+
+#### Git Commit Rule
+
+- 実装完了後、Codex に以下を実行させる:
+  - `git add <changed_files>`
+  - `git commit -m "<descriptive message>"`
+- コミットメッセージは変更内容の「why」を含むこと
+- **It is unacceptable** to complete implementation without a git commit
+
 ### C. Adversarial Review
 
 通常は hook が自動で実行する。
@@ -78,3 +92,9 @@ maxTurns: 20
   - `timeout` / prompt 長 / diff サイズの問題として報告
 - JSON 不正:
   - wrapper script 側の再試行後も失敗なら `ERROR` として返す
+
+### Self-Evaluation Warning
+
+- Codex が `tests_status: PASS` を報告しても、実際のテスト出力を確認すること
+- 生成者の自己評価は過大評価する傾向がある（Self-Evaluation Unreliability Principle）
+- 疑わしい場合は、orchestrator が直接テストログを検証する

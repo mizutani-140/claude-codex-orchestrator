@@ -24,6 +24,14 @@ maxTurns: 12
 
 以下の構造で必ず出力すること。
 
+### 0. Feature List 参照（必須）
+
+計画立案の最初のステップとして、`feature-list.json` を読み込み、対象タスクの `id` を特定する。
+
+- `target_feature_id`: 対象 feature の id（必須）
+- 1 つの計画で扱うのは 1 feature のみ
+- **It is unacceptable** to create a plan without referencing feature-list.json
+
 ### 1. タスク要約
 - ユーザーが求めていること
 - 期待される最終成果
@@ -66,3 +74,5 @@ maxTurns: 12
 - 曖昧な言い回しを避ける
 - 「どのファイルに何をするか」が分かる粒度にする
 - リファクタリング拡大を避け、最小安全変更を優先する
+- 計画には必ず `target_feature_id` を含める
+- acceptance criteria は feature-list.json の `acceptance` フィールドと整合させる

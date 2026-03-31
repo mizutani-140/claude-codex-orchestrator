@@ -34,7 +34,7 @@ if [[ "$COMMAND" =~ ^codex[[:space:]] ]]; then
 fi
 
 # --- 明示許可: wrapper script 呼び出し ---
-if echo "$COMMAND" | grep -Eq 'hooks/scripts/(codex-plan-bridge|codex-implement|codex-adversarial-review|codex-architecture-gate)\.sh'; then
+if echo "$COMMAND" | grep -Eq 'hooks/scripts/(codex-plan-bridge|codex-implement|codex-adversarial-review|codex-architecture-gate|init|session-start|session-end)\.sh'; then
   allow
 fi
 
