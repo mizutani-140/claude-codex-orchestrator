@@ -1,0 +1,19 @@
+{
+  "name": "claude-codex-orchestrator",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "orch-health": "./dist/orch-health/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "check": "node dist/orch-health/cli.js check",
+    "status": "node dist/orch-health/cli.js status"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^3.0.0",
+    "@types/node": "^22.0.0"
+  }
+}
