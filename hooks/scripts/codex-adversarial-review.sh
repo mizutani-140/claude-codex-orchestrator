@@ -18,8 +18,46 @@ if [[ -z "$DIFF" ]]; then
   exit 0
 fi
 
+stderr_excerpt() {
+  local stderr_file="$1"
+  if [[ ! -s "$stderr_file" ]]; then
+    echo ""
+    return
+  fi
+  tr '\r\n' '  ' <"$stderr_file" | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//' | cut -c1-500
+}
+
+error_result_json() {
+  local summary="$1"
+  jq -cn \
+    --arg summary "$summary" \
+    '{"status":"ERROR","summary":$summary,"blocking_issues":["Invalid review response"],"fix_instructions":["Retry the review or inspect Codex stderr/output"]}'
+}
+
+stderr_indicates_output_last_message_unsupported() {
+  local stderr_text="$1"
+  if [[ -z "$stderr_text" ]]; then
+    return 1
+  fi
+  printf '%s\n' "$stderr_text" | grep -Eiq 'unknown option|unrecognized'
+}
+
+is_valid_json() {
+  local candidate="${1:-}"
+  printf '%s' "$candidate" | jq -e . >/dev/null 2>&1
+}
+
+LAST_CODEX_EXIT_CODE=0
+LAST_CODEX_STDERR=""
+RESULT=""
+
 run_review() {
-  local extra="$1"
+  local retry_instruction="${1:-}"
+  local tmp_out
+  tmp_out="$(mktemp "${TMPDIR:-/tmp}/codex-out-XXXXXX")"
+  local tmp_err
+  tmp_err="$(mktemp "${TMPDIR:-/tmp}/codex-err-XXXXXX")"
+  local exit_code=0
   local prompt
   prompt="$(cat <<EOF
 Perform an adversarial review of the current diff.
@@ -37,6 +75,8 @@ Return JSON only. No markdown fences. Use exactly this schema:
   ]
 }
 
+$retry_instruction
+
 Review from these angles:
 - correctness
 - auth / permission / data-loss risk
@@ -47,8 +87,6 @@ Review from these angles:
 
 Set status=PASS only if there are no blocking design or implementation issues.
 
-$extra
-
 --- DIFF STAT ---
 $DIFF_STAT
 
@@ -56,17 +94,42 @@ $DIFF_STAT
 $DIFF
 EOF
 )"
-  codex exec --sandbox read-only --quiet "$prompt"
+  if codex exec --sandbox read-only --output-last-message "$tmp_out" "$prompt" >/dev/null 2>"$tmp_err"; then
+    exit_code=0
+  else
+    exit_code=$?
+  fi
+  LAST_CODEX_STDERR="$(stderr_excerpt "$tmp_err")"
+  RESULT="$(cat "$tmp_out" 2>/dev/null || echo "")"
+
+  if [[ ! -s "$tmp_out" ]] || { [[ "$exit_code" -ne 0 ]] && stderr_indicates_output_last_message_unsupported "$LAST_CODEX_STDERR"; }; then
+    if codex exec --sandbox read-only "$prompt" >"$tmp_out" 2>"$tmp_err"; then
+      exit_code=0
+    else
+      exit_code=$?
+    fi
+    LAST_CODEX_STDERR="$(stderr_excerpt "$tmp_err")"
+    RESULT="$(cat "$tmp_out" 2>/dev/null || echo "")"
+  fi
+
+  LAST_CODEX_EXIT_CODE="$exit_code"
+  rm -f "$tmp_out" "$tmp_err"
 }
 
-RESULT="$(run_review "")"
+run_review
 
-if ! echo "$RESULT" | jq -e . >/dev/null 2>&1; then
-  RESULT="$(run_review "IMPORTANT: Return valid JSON only. No prose outside JSON.")"
+if ! is_valid_json "$RESULT"; then
+  run_review "IMPORTANT: Return valid JSON only. No prose outside JSON."
 fi
 
-if ! echo "$RESULT" | jq -e . >/dev/null 2>&1; then
-  RESULT='{"status":"ERROR","summary":"Codex adversarial review did not return valid JSON","blocking_issues":["Invalid review response"],"fix_instructions":["Retry the review or inspect Codex auth/timeouts"]}'
+if ! is_valid_json "$RESULT"; then
+  SUMMARY="Codex adversarial review did not return valid JSON"
+  if [[ "$LAST_CODEX_EXIT_CODE" -ne 0 ]]; then
+    SUMMARY="Codex failed (exit $LAST_CODEX_EXIT_CODE): ${LAST_CODEX_STDERR:-no stderr output}"
+  elif [[ -n "$LAST_CODEX_STDERR" ]]; then
+    SUMMARY="$SUMMARY: $LAST_CODEX_STDERR"
+  fi
+  RESULT="$(error_result_json "$SUMMARY")"
 fi
 
 echo "$RESULT" | tee "$OUT_FILE"
