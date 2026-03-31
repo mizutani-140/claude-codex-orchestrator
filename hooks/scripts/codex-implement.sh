@@ -130,10 +130,69 @@ EOF
   rm -f "$tmp_out" "$tmp_err"
 }
 
+run_output_only_retry() {
+  # Output-only retry uses sandbox read-only to avoid any further mutations.
+  local tmp_out
+  tmp_out="$(mktemp "${TMPDIR:-/tmp}/codex-out-XXXXXX")"
+  local tmp_err
+  tmp_err="$(mktemp "${TMPDIR:-/tmp}/codex-err-XXXXXX")"
+  local worktree_diff
+  worktree_diff="$(git diff HEAD 2>/dev/null | head -200 || echo "(no diff available)")"
+  local worktree_stat
+  worktree_stat="$(git diff --stat HEAD 2>/dev/null || echo "(no stat available)")"
+  local changed_files_list
+  changed_files_list="$(git diff --name-only HEAD 2>/dev/null || echo "")"
+  local prompt
+  prompt="You are summarizing the result of a code implementation task.
+Do NOT modify any files. Only produce a JSON summary.
+
+The worktree currently has the following changes:
+
+--- CHANGED FILES ---
+${changed_files_list}
+
+--- DIFF STAT ---
+${worktree_stat}
+
+--- DIFF (first 200 lines) ---
+${worktree_diff}
+
+Return JSON only. No markdown fences. Use exactly this schema:
+
+{
+  \"status\": \"DONE|PARTIAL|ERROR\",
+  \"summary\": \"short summary of what was changed\",
+  \"changed_files\": [\"path1\", \"path2\"],
+  \"tests_run\": [],
+  \"tests_status\": \"NOT_RUN\",
+  \"test_log\": \"Output-only retry: tests were not re-executed\",
+  \"remaining_risks\": [\"JSON output was malformed on first attempt; this is a summary-only retry\"]
+}
+
+Set status to PARTIAL since tests were not re-executed in this retry."
+
+  if codex exec -m gpt-5.4-mini --sandbox read-only --full-auto --output-last-message "$tmp_out" "$prompt" >/dev/null 2>"$tmp_err"; then
+    true
+  else
+    true
+  fi
+  RESULT="$(cat "$tmp_out" 2>/dev/null || echo "")"
+  if [[ ! -s "$tmp_out" ]]; then
+    if codex exec -m gpt-5.4-mini --sandbox read-only --full-auto "$prompt" >"$tmp_out" 2>"$tmp_err"; then
+      true
+    else
+      true
+    fi
+    RESULT="$(cat "$tmp_out" 2>/dev/null || echo "")"
+  fi
+  rm -f "$tmp_out" "$tmp_err"
+}
+
 run_impl
 
 if ! is_valid_json "$RESULT"; then
-  run_impl "IMPORTANT: Return valid JSON only. No prose outside JSON."
+  # Output-only retry: read-only sandbox, no mutation, just JSON formatting
+  run_output_only_retry
 fi
 
 if ! is_valid_json "$RESULT"; then
