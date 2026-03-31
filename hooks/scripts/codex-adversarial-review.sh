@@ -12,10 +12,36 @@ fi
 
 DIFF="$(git diff HEAD 2>/dev/null || true)"
 DIFF_STAT="$(git diff --stat HEAD 2>/dev/null || true)"
+REVIEW_ROUND="${ADVERSARIAL_REVIEW_ROUND:-0}"
+PREVIOUS_ISSUES="${ADVERSARIAL_PREVIOUS_ISSUES:-}"
+DIFF_FOR_REVIEW="$DIFF"
+DIFF_NOTE=""
+PREVIOUS_REVIEW_CONTEXT=""
 
 if [[ -z "$DIFF" ]]; then
   echo '{"status":"PASS","summary":"No diff to review","blocking_issues":[],"fix_instructions":[]}' | tee "$OUT_FILE"
   exit 0
+fi
+
+if [[ -n "${ADVERSARIAL_INCREMENTAL_DIFF:-}" ]]; then
+  DIFF_FOR_REVIEW="${ADVERSARIAL_INCREMENTAL_DIFF}"
+  DIFF_NOTE="以下は前回レビューから変更があったファイルのみの diff です。"
+fi
+
+if [[ "$REVIEW_ROUND" =~ ^[0-9]+$ ]] && [[ "$REVIEW_ROUND" -ge 2 ]]; then
+  PREVIOUS_REVIEW_CONTEXT="$(cat <<EOF
+
+--- PREVIOUS REVIEW CONTEXT (Round $REVIEW_ROUND) ---
+前回の adversarial review で指摘された内容:
+$PREVIOUS_ISSUES
+
+重要な指示:
+1. 前回の指摘が修正されたかを最優先で確認すること
+2. 修正済みの問題を再度指摘しないこと
+3. 新たに発見した blocking issue は深刻度に関わらず報告すること
+4. 前回の指摘が適切に修正されていれば status=PASS とすること
+EOF
+)"
 fi
 
 stderr_excerpt() {
@@ -84,6 +110,7 @@ Review from these angles:
 - race condition / reliability
 - maintainability and unnecessary complexity
 - simpler safer alternative if applicable
+$PREVIOUS_REVIEW_CONTEXT
 
 Set status=PASS only if there are no blocking design or implementation issues.
 
@@ -91,10 +118,11 @@ Set status=PASS only if there are no blocking design or implementation issues.
 $DIFF_STAT
 
 --- DIFF ---
-$DIFF
+$DIFF_NOTE
+$DIFF_FOR_REVIEW
 EOF
 )"
-  if codex exec --sandbox read-only --output-last-message "$tmp_out" "$prompt" >/dev/null 2>"$tmp_err"; then
+  if codex exec -m gpt-5.4-mini --sandbox read-only --output-last-message "$tmp_out" "$prompt" >/dev/null 2>"$tmp_err"; then
     exit_code=0
   else
     exit_code=$?
@@ -103,7 +131,7 @@ EOF
   RESULT="$(cat "$tmp_out" 2>/dev/null || echo "")"
 
   if [[ ! -s "$tmp_out" ]] || { [[ "$exit_code" -ne 0 ]] && stderr_indicates_output_last_message_unsupported "$LAST_CODEX_STDERR"; }; then
-    if codex exec --sandbox read-only "$prompt" >"$tmp_out" 2>"$tmp_err"; then
+    if codex exec -m gpt-5.4-mini --sandbox read-only "$prompt" >"$tmp_out" 2>"$tmp_err"; then
       exit_code=0
     else
       exit_code=$?

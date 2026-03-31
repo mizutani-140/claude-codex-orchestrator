@@ -48,8 +48,18 @@ fi
 
 OUT_FILE=""
 PROMPT=""
+CAPTURED_MODEL=""
+CAPTURED_CONFIGS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    -m)
+      CAPTURED_MODEL="$2"
+      shift 2
+      ;;
+    -c)
+      CAPTURED_CONFIGS+=("$2")
+      shift 2
+      ;;
     --output-last-message)
       if [[ "${FAKE_CODEX_SUPPORTS_OUTPUT_LAST_MESSAGE:-1}" != "1" ]]; then
         echo "error: unknown option --output-last-message" >&2
@@ -70,6 +80,14 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ -n "${FAKE_CODEX_CAPTURED_MODEL_FILE:-}" && -n "$CAPTURED_MODEL" ]]; then
+  printf '%s\n' "$CAPTURED_MODEL" > "${FAKE_CODEX_CAPTURED_MODEL_FILE}"
+fi
+
+if [[ -n "${FAKE_CODEX_CAPTURED_CONFIG_FILE:-}" && "${#CAPTURED_CONFIGS[@]}" -gt 0 ]]; then
+  printf '%s\n' "${CAPTURED_CONFIGS[@]}" > "${FAKE_CODEX_CAPTURED_CONFIG_FILE}"
+fi
 
 if [[ -n "${FAKE_CODEX_PROMPT_LOG_FILE:-}" ]]; then
   {
@@ -238,10 +256,74 @@ stop_prompt_log() {
 check_prompt_contains() {
   local label="$1"
   local expected="$2"
-  if [[ -n "${FAKE_CODEX_PROMPT_LOG_FILE:-}" ]] && grep -Fq "$expected" "$FAKE_CODEX_PROMPT_LOG_FILE"; then
+  if [[ -n "${FAKE_CODEX_PROMPT_LOG_FILE:-}" ]] && grep -Fq -- "$expected" "$FAKE_CODEX_PROMPT_LOG_FILE"; then
     pass "$label"
   else
     fail "$label" "expected prompt log to contain '$expected'"
+  fi
+}
+
+check_prompt_not_contains() {
+  local label="$1"
+  local unexpected="$2"
+  if [[ -n "${FAKE_CODEX_PROMPT_LOG_FILE:-}" ]] && grep -Fq -- "$unexpected" "$FAKE_CODEX_PROMPT_LOG_FILE"; then
+    fail "$label" "did not expect prompt log to contain '$unexpected'"
+  else
+    pass "$label"
+  fi
+}
+
+start_model_capture() {
+  FAKE_CODEX_CAPTURED_MODEL_FILE="$(mktemp "$FAKE_DIR/codex-model-XXXXXX")"
+  : > "$FAKE_CODEX_CAPTURED_MODEL_FILE"
+  export FAKE_CODEX_CAPTURED_MODEL_FILE
+}
+
+stop_model_capture() {
+  if [[ -n "${FAKE_CODEX_CAPTURED_MODEL_FILE:-}" ]]; then
+    rm -f "$FAKE_CODEX_CAPTURED_MODEL_FILE"
+  fi
+  unset FAKE_CODEX_CAPTURED_MODEL_FILE
+}
+
+check_model_equals() {
+  local label="$1"
+  local expected="$2"
+  local actual=""
+  if [[ -n "${FAKE_CODEX_CAPTURED_MODEL_FILE:-}" && -f "${FAKE_CODEX_CAPTURED_MODEL_FILE}" ]]; then
+    actual="$(tail -n 1 "$FAKE_CODEX_CAPTURED_MODEL_FILE")"
+  fi
+  if [[ "$actual" == "$expected" ]]; then
+    pass "$label"
+  else
+    fail "$label" "expected model '$expected' but got '$actual'"
+  fi
+}
+
+start_config_capture() {
+  FAKE_CODEX_CAPTURED_CONFIG_FILE="$(mktemp "$FAKE_DIR/codex-config-XXXXXX")"
+  : > "$FAKE_CODEX_CAPTURED_CONFIG_FILE"
+  export FAKE_CODEX_CAPTURED_CONFIG_FILE
+}
+
+stop_config_capture() {
+  if [[ -n "${FAKE_CODEX_CAPTURED_CONFIG_FILE:-}" ]]; then
+    rm -f "$FAKE_CODEX_CAPTURED_CONFIG_FILE"
+  fi
+  unset FAKE_CODEX_CAPTURED_CONFIG_FILE
+}
+
+check_config_equals() {
+  local label="$1"
+  local expected="$2"
+  local actual=""
+  if [[ -n "${FAKE_CODEX_CAPTURED_CONFIG_FILE:-}" && -f "${FAKE_CODEX_CAPTURED_CONFIG_FILE}" ]]; then
+    actual="$(tail -n 1 "$FAKE_CODEX_CAPTURED_CONFIG_FILE")"
+  fi
+  if [[ "$actual" == "$expected" ]]; then
+    pass "$label"
+  else
+    fail "$label" "expected config '$expected' but got '$actual'"
   fi
 }
 
@@ -267,6 +349,12 @@ run_adversarial_review() {
   printf '%s' "$result"
 }
 
+clear_adversarial_review_env() {
+  unset ADVERSARIAL_REVIEW_ROUND
+  unset ADVERSARIAL_PREVIOUS_ISSUES
+  unset ADVERSARIAL_INCREMENTAL_DIFF
+}
+
 set_fake_codex_behavior "success" "1" "WARNING: telemetry connection refused" "0" "file output success" "not json" "NOTICE: noisy stdout"
 start_exec_count
 RESULT="$(run_implement)"
@@ -290,6 +378,61 @@ check_json "codex-adversarial-review.sh returns JSON when --output-last-message 
 check_summary_equals "codex-adversarial-review.sh prefers --output-last-message output when supported" "$RESULT" "file output success"
 check_exec_count "codex-adversarial-review.sh executes codex once when --output-last-message works" "1"
 stop_exec_count
+
+set_fake_codex_behavior "success" "1" "" "0" "file output success"
+start_model_capture
+run_plan >/dev/null
+check_model_equals "codex-plan-bridge.sh passes -m gpt-5.4-mini" "gpt-5.4-mini"
+stop_model_capture
+
+set_fake_codex_behavior "success" "1" "" "0" "file output success"
+start_model_capture
+clear_adversarial_review_env
+run_adversarial_review >/dev/null
+check_model_equals "codex-adversarial-review.sh passes -m gpt-5.4-mini" "gpt-5.4-mini"
+stop_model_capture
+
+set_fake_codex_behavior "success" "1" "" "0" "file output success"
+start_model_capture
+run_implement >/dev/null
+check_model_equals "codex-implement.sh passes -m gpt-5.4" "gpt-5.4"
+stop_model_capture
+
+set_fake_codex_behavior "success" "1" "" "0" "file output success"
+start_config_capture
+run_implement >/dev/null
+check_config_equals "codex-implement.sh passes -c model_reasoning_effort=high" "model_reasoning_effort=high"
+stop_config_capture
+
+set_fake_codex_behavior "success" "1" "" "0" "file output success"
+start_prompt_log
+export ADVERSARIAL_REVIEW_ROUND=2
+export ADVERSARIAL_PREVIOUS_ISSUES='{"blocking_issues":["carry over"],"fix_instructions":["verify fix"]}'
+unset ADVERSARIAL_INCREMENTAL_DIFF
+run_adversarial_review >/dev/null
+check_prompt_contains "codex-adversarial-review.sh includes PREVIOUS REVIEW CONTEXT on round 2" "--- PREVIOUS REVIEW CONTEXT (Round 2) ---"
+check_prompt_contains "codex-adversarial-review.sh includes previous issue payload on round 2" '"blocking_issues":["carry over"]'
+stop_prompt_log
+clear_adversarial_review_env
+
+set_fake_codex_behavior "success" "1" "" "0" "file output success"
+start_prompt_log
+clear_adversarial_review_env
+export ADVERSARIAL_INCREMENTAL_DIFF=$'diff --git a/clean.txt b/clean.txt\n+clean incremental diff'
+run_adversarial_review >/dev/null
+check_prompt_not_contains "codex-adversarial-review.sh omits PREVIOUS REVIEW CONTEXT when round is unset" "--- PREVIOUS REVIEW CONTEXT"
+stop_prompt_log
+clear_adversarial_review_env
+
+set_fake_codex_behavior "success" "1" "" "0" "file output success"
+start_prompt_log
+clear_adversarial_review_env
+export ADVERSARIAL_INCREMENTAL_DIFF=$'diff --git a/incremental.txt b/incremental.txt\n+incremental only change'
+run_adversarial_review >/dev/null
+check_prompt_contains "codex-adversarial-review.sh notes incremental diff usage" "以下は前回レビューから変更があったファイルのみの diff です。"
+check_prompt_contains "codex-adversarial-review.sh includes ADVERSARIAL_INCREMENTAL_DIFF content" "+incremental only change"
+stop_prompt_log
+clear_adversarial_review_env
 
 set_fake_codex_behavior "success" "0" "" "0" "stdout fallback success"
 start_exec_count

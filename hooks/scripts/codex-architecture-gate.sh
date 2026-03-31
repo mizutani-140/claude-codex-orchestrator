@@ -24,7 +24,8 @@ init_state() {
   "review_round": 0,
   "max_review_rounds": 3,
   "last_gate_status": "IDLE",
-  "last_gate_summary": ""
+  "last_gate_summary": "",
+  "previous_diff_files": ""
 }
 EOF
 }
@@ -35,6 +36,7 @@ write_state() {
   local max_rounds="$3"
   local status="$4"
   local summary="$5"
+  local prev_files="$6"
 
   jq -n \
     --arg active_diff_hash "$hash" \
@@ -42,12 +44,14 @@ write_state() {
     --argjson max_review_rounds "$max_rounds" \
     --arg last_gate_status "$status" \
     --arg last_gate_summary "$summary" \
+    --arg previous_diff_files "$prev_files" \
     '{
       active_diff_hash: $active_diff_hash,
       review_round: $review_round,
       max_review_rounds: $max_review_rounds,
       last_gate_status: $last_gate_status,
-      last_gate_summary: $last_gate_summary
+      last_gate_summary: $last_gate_summary,
+      previous_diff_files: $previous_diff_files
     }' > "$STATE_FILE"
 }
 
@@ -135,6 +139,11 @@ REVIEW_ROUND="$(read_state_field review_round)"
 MAX_REVIEW_ROUNDS="$(read_state_field max_review_rounds)"
 LAST_STATUS="$(read_state_field last_gate_status)"
 LAST_SUMMARY="$(read_state_field last_gate_summary)"
+PREVIOUS_DIFF_FILES="$(read_state_field previous_diff_files)"
+
+if [[ "$PREVIOUS_DIFF_FILES" == "null" ]]; then
+  PREVIOUS_DIFF_FILES=""
+fi
 
 # 同一 diff に対して既に FAIL 済みなら、同じ review を再実行せず block のみ返す
 if [[ "$DIFF_HASH" == "$ACTIVE_HASH" && "$LAST_STATUS" == "FAIL" ]]; then
@@ -157,22 +166,29 @@ else
   fi
 fi
 
-REVIEW_JSON="$(bash "$PROJECT_DIR/hooks/scripts/codex-adversarial-review.sh")"
+PREV_ISSUES=""
+if [[ -f "$REVIEW_FILE" ]] && [[ "$REVIEW_ROUND" -ge 2 ]]; then
+  PREV_ISSUES="$(jq -c '{blocking_issues: .blocking_issues, fix_instructions: .fix_instructions}' "$REVIEW_FILE" 2>/dev/null || echo "")"
+fi
+
+INCREMENTAL_DIFF=""
+
+REVIEW_JSON="$(ADVERSARIAL_REVIEW_ROUND="$REVIEW_ROUND" ADVERSARIAL_PREVIOUS_ISSUES="$PREV_ISSUES" ADVERSARIAL_INCREMENTAL_DIFF="$INCREMENTAL_DIFF" bash "$PROJECT_DIR/hooks/scripts/codex-adversarial-review.sh")"
 REVIEW_STATUS="$(echo "$REVIEW_JSON" | jq -r '.status // "ERROR"')"
 REVIEW_SUMMARY="$(echo "$REVIEW_JSON" | jq -r '.summary // "No summary provided"')"
 
 if [[ "$REVIEW_STATUS" == "PASS" ]]; then
-  write_state "$DIFF_HASH" "$REVIEW_ROUND" "$MAX_REVIEW_ROUNDS" "PASS" "$REVIEW_SUMMARY"
+  write_state "$DIFF_HASH" "$REVIEW_ROUND" "$MAX_REVIEW_ROUNDS" "PASS" "$REVIEW_SUMMARY" "$DIFF_FILES"
   exit 0
 fi
 
 if [[ "$REVIEW_ROUND" -ge "$MAX_REVIEW_ROUNDS" ]]; then
-  write_state "$DIFF_HASH" "$REVIEW_ROUND" "$MAX_REVIEW_ROUNDS" "TERMINAL" "$REVIEW_SUMMARY"
+  write_state "$DIFF_HASH" "$REVIEW_ROUND" "$MAX_REVIEW_ROUNDS" "TERMINAL" "$REVIEW_SUMMARY" "$DIFF_FILES"
   json_block "Architecture gate: 最大修正回数に到達しました（${REVIEW_ROUND}/${MAX_REVIEW_ROUNDS}）。\n理由: $REVIEW_SUMMARY\n\nこれ以上の自動修正は行わず、未解決の blocking issue と残リスクをユーザーに報告してから停止してください。参照: .claude/last-adversarial-review.json"
   exit 0
 fi
 
-write_state "$DIFF_HASH" "$REVIEW_ROUND" "$MAX_REVIEW_ROUNDS" "FAIL" "$REVIEW_SUMMARY"
+write_state "$DIFF_HASH" "$REVIEW_ROUND" "$MAX_REVIEW_ROUNDS" "FAIL" "$REVIEW_SUMMARY" "$DIFF_FILES"
 
 REASON_TEXT="Architecture gate: FAIL（${REVIEW_ROUND}/${MAX_REVIEW_ROUNDS}）。\n\n検出理由: $(IFS=' / '; echo "${REASONS[*]}")\nCodex summary: $REVIEW_SUMMARY\n\n次の手順:\n1. .claude/last-adversarial-review.json を読む\n2. codex-executor で fix_instructions に従う最小修正を Codex に委任する\n3. relevant tests を再実行させる\n4. 修正後に再度 stop を試みる"
 

@@ -97,7 +97,7 @@ $PLAN_TEXT
 --- PLAN END ---
 EOF
 )"
-  if codex exec --sandbox read-only --output-last-message "$tmp_out" "$prompt" >/dev/null 2>"$tmp_err"; then
+  if codex exec -m gpt-5.4-mini --sandbox read-only --output-last-message "$tmp_out" "$prompt" >/dev/null 2>"$tmp_err"; then
     exit_code=0
   else
     exit_code=$?
@@ -106,7 +106,7 @@ EOF
   RESULT="$(cat "$tmp_out" 2>/dev/null || echo "")"
 
   if [[ ! -s "$tmp_out" ]] || { [[ "$exit_code" -ne 0 ]] && stderr_indicates_output_last_message_unsupported "$LAST_CODEX_STDERR"; }; then
-    if codex exec --sandbox read-only "$prompt" >"$tmp_out" 2>"$tmp_err"; then
+    if codex exec -m gpt-5.4-mini --sandbox read-only "$prompt" >"$tmp_out" 2>"$tmp_err"; then
       exit_code=0
     else
       exit_code=$?

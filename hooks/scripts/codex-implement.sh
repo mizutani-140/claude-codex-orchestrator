@@ -87,7 +87,7 @@ $TASK_TEXT
 --- TASK END ---
 EOF
 )"
-  if codex exec --sandbox workspace-write --full-auto --output-last-message "$tmp_out" "$prompt" >/dev/null 2>"$tmp_err"; then
+  if codex exec -m gpt-5.4 -c model_reasoning_effort="high" --sandbox workspace-write --full-auto --output-last-message "$tmp_out" "$prompt" >/dev/null 2>"$tmp_err"; then
     exit_code=0
   else
     exit_code=$?
@@ -96,7 +96,7 @@ EOF
   RESULT="$(cat "$tmp_out" 2>/dev/null || echo "")"
 
   if [[ ! -s "$tmp_out" ]] || { [[ "$exit_code" -ne 0 ]] && stderr_indicates_output_last_message_unsupported "$LAST_CODEX_STDERR"; }; then
-    if codex exec --sandbox workspace-write --full-auto "$prompt" >"$tmp_out" 2>"$tmp_err"; then
+    if codex exec -m gpt-5.4 -c model_reasoning_effort="high" --sandbox workspace-write --full-auto "$prompt" >"$tmp_out" 2>"$tmp_err"; then
       exit_code=0
     else
       exit_code=$?
