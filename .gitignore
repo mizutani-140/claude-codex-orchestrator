@@ -1,0 +1,5 @@
+# Claude × Codex orchestration runtime state
+.claude/review-gate-state.json
+.claude/last-plan-critique.json
+.claude/last-implementation-result.json
+.claude/last-adversarial-review.json
