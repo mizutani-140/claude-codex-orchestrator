@@ -1,10 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/session-util.sh" 2>/dev/null || true
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-IMPL_FILE="$PROJECT_DIR/.claude/last-implementation-result.json"
-CONTRACT_FILE="$PROJECT_DIR/.claude/last-sprint-contract.json"
-OUT_FILE="$PROJECT_DIR/.claude/last-eval-gate.json"
+SESSION_DIR="$(ensure_session_dir 2>/dev/null || echo "$PROJECT_DIR/.claude")"
+
+# Input: implementation result (session-scoped with legacy fallback)
+SESSION_ID="$(get_session_id 2>/dev/null || echo "")"
+
+IMPL_FILE="$SESSION_DIR/implementation.json"
+if [[ ! -f "$IMPL_FILE" ]]; then
+  if [[ -z "$SESSION_ID" ]]; then
+    IMPL_FILE="$PROJECT_DIR/.claude/last-implementation-result.json"
+  fi
+fi
+
+# Input: sprint contract (optional)
+CONTRACT_FILE="$SESSION_DIR/sprint-contract.json"
+if [[ ! -f "$CONTRACT_FILE" ]]; then
+  if [[ -z "$SESSION_ID" ]]; then
+    CONTRACT_FILE="$PROJECT_DIR/.claude/last-sprint-contract.json"
+  fi
+fi
+
+# Output
+OUT_FILE="$SESSION_DIR/eval-gate.json"
+LEGACY_OUT_FILE="$PROJECT_DIR/.claude/last-eval-gate.json"
 mkdir -p "$PROJECT_DIR/.claude"
 
 json_block() {
@@ -28,9 +49,17 @@ fail_result() {
     '{status:"FAIL",checks:{test_log_present:false,tests_passed:false,no_failure_keywords:false},failures:$failures,summary:$summary}'
 }
 
+write_result() {
+  local content="$1"
+  echo "$content" | tee "$OUT_FILE"
+  if [[ "$OUT_FILE" != "$LEGACY_OUT_FILE" ]]; then
+    cp "$OUT_FILE" "$LEGACY_OUT_FILE" 2>/dev/null || true
+  fi
+}
+
 if [[ ! -f "$IMPL_FILE" ]]; then
   RESULT="$(fail_result "No implementation result found" "Missing .claude/last-implementation-result.json")"
-  echo "$RESULT" | tee "$OUT_FILE"
+  write_result "$RESULT"
   json_block "Eval gate: FAIL - No implementation result found. Run codex-implement.sh first."
   exit 0
 fi
@@ -66,7 +95,7 @@ fi
 if [[ ${#FAILURES[@]} -gt 0 ]]; then
   SUMMARY="Eval gate failed: ${#FAILURES[@]} check(s) failed"
   RESULT="$(fail_result "$SUMMARY" "${FAILURES[@]}")"
-  echo "$RESULT" | tee "$OUT_FILE"
+  write_result "$RESULT"
   FAILURE_TEXT="$(printf '\n- %s' "${FAILURES[@]}")"
   json_block "Eval gate: FAIL - ${#FAILURES[@]} check(s) failed:${FAILURE_TEXT}\n\nFix the issues and retry."
   exit 0
@@ -74,5 +103,5 @@ fi
 
 SUMMARY="All eval checks passed: test_log present, tests PASS, no failure keywords"
 RESULT="$(pass_result "$SUMMARY")"
-echo "$RESULT" | tee "$OUT_FILE"
+write_result "$RESULT"
 exit 0

@@ -2,10 +2,14 @@
 set -euo pipefail
 
 INPUT="$(cat)"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/session-util.sh" 2>/dev/null || true
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 STATE_DIR="$PROJECT_DIR/.claude"
-STATE_FILE="$STATE_DIR/review-gate-state.json"
-REVIEW_FILE="$STATE_DIR/last-adversarial-review.json"
+SESSION_DIR="$(ensure_session_dir 2>/dev/null || echo "$STATE_DIR")"
+STATE_FILE="$SESSION_DIR/review-gate-state.json"
+REVIEW_FILE="$SESSION_DIR/architecture-review.json"
+LEGACY_REVIEW_FILE="$STATE_DIR/last-adversarial-review.json"
+LEGACY_STATE_FILE="$STATE_DIR/review-gate-state.json"
 
 mkdir -p "$STATE_DIR"
 
@@ -28,6 +32,9 @@ init_state() {
   "previous_diff_files": ""
 }
 EOF
+  if [[ "$STATE_FILE" != "$LEGACY_STATE_FILE" ]]; then
+    cp "$STATE_FILE" "$LEGACY_STATE_FILE" 2>/dev/null || true
+  fi
 }
 
 write_state() {
@@ -53,6 +60,9 @@ write_state() {
       last_gate_summary: $last_gate_summary,
       previous_diff_files: $previous_diff_files
     }' > "$STATE_FILE"
+  if [[ "$STATE_FILE" != "$LEGACY_STATE_FILE" ]]; then
+    cp "$STATE_FILE" "$LEGACY_STATE_FILE" 2>/dev/null || true
+  fi
 }
 
 read_state_field() {
@@ -78,19 +88,23 @@ if [[ ! -f "$STATE_FILE" ]]; then
   init_state
 fi
 
+READ_REVIEW_FILE="$REVIEW_FILE"
+if [[ ! -f "$READ_REVIEW_FILE" ]]; then
+  READ_REVIEW_FILE="$LEGACY_REVIEW_FILE"
+fi
+
 DIFF_FILES="$(git diff --name-only HEAD 2>/dev/null || true)"
 DIFF_TEXT="$(git diff HEAD 2>/dev/null || true)"
 
 # Fallback: if unstaged diff is empty, check session-base-commit for committed changes
 if [[ -z "$DIFF_FILES" || -z "$DIFF_TEXT" ]]; then
-  BASE_COMMIT_FILE="$STATE_DIR/session-base-commit"
-  if [[ -f "$BASE_COMMIT_FILE" ]]; then
-    BASE_COMMIT="$(cat "$BASE_COMMIT_FILE")"
+  BASE_COMMIT="$(get_session_base_commit 2>/dev/null || echo "")"
+  if [[ -n "$BASE_COMMIT" ]]; then
     if git rev-parse --verify "${BASE_COMMIT}^{commit}" >/dev/null 2>&1; then
       DIFF_FILES="$(git diff --name-only "$BASE_COMMIT"...HEAD 2>/dev/null || true)"
       DIFF_TEXT="$(git diff "$BASE_COMMIT"...HEAD 2>/dev/null || true)"
     else
-      json_block "Architecture gate: ERROR. session-base-commit contains invalid ref; cannot verify diff baseline"
+      json_block "Architecture gate: ERROR. session base commit is invalid; cannot verify diff baseline"
       exit 0
     fi
   fi
@@ -187,13 +201,17 @@ else
 fi
 
 PREV_ISSUES=""
-if [[ -f "$REVIEW_FILE" ]] && [[ "$REVIEW_ROUND" -ge 2 ]]; then
-  PREV_ISSUES="$(jq -c '{blocking_issues: .blocking_issues, fix_instructions: .fix_instructions}' "$REVIEW_FILE" 2>/dev/null || echo "")"
+if [[ -f "$READ_REVIEW_FILE" ]] && [[ "$REVIEW_ROUND" -ge 2 ]]; then
+  PREV_ISSUES="$(jq -c '{blocking_issues: .blocking_issues, fix_instructions: .fix_instructions}' "$READ_REVIEW_FILE" 2>/dev/null || echo "")"
 fi
 
 INCREMENTAL_DIFF=""
 
 REVIEW_JSON="$(ADVERSARIAL_REVIEW_ROUND="$REVIEW_ROUND" ADVERSARIAL_PREVIOUS_ISSUES="$PREV_ISSUES" ADVERSARIAL_INCREMENTAL_DIFF="$INCREMENTAL_DIFF" bash "$PROJECT_DIR/hooks/scripts/codex-adversarial-review.sh")"
+printf '%s\n' "$REVIEW_JSON" > "$REVIEW_FILE"
+if [[ "$REVIEW_FILE" != "$LEGACY_REVIEW_FILE" ]]; then
+  cp "$REVIEW_FILE" "$LEGACY_REVIEW_FILE" 2>/dev/null || true
+fi
 REVIEW_STATUS="$(echo "$REVIEW_JSON" | jq -r '.status // "ERROR"')"
 REVIEW_SUMMARY="$(echo "$REVIEW_JSON" | jq -r '.summary // "No summary provided"')"
 

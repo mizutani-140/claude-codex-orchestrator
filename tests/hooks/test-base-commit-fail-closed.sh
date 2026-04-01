@@ -12,6 +12,7 @@ make_repo() {
   mkdir -p "$repo_dir/hooks/scripts"
   cp "$PROJECT_DIR/hooks/scripts/codex-architecture-gate.sh" "$repo_dir/hooks/scripts/"
   cp "$PROJECT_DIR/hooks/scripts/codex-adversarial-review.sh" "$repo_dir/hooks/scripts/"
+  cp "$PROJECT_DIR/hooks/scripts/session-util.sh" "$repo_dir/hooks/scripts/"
   cd "$repo_dir"
   git init -q
   git config user.name "Test User"
@@ -44,7 +45,11 @@ fi
 
 TEST2_DIR="$TMPDIR_BASE/invalid"
 make_repo "$TEST2_DIR"
-printf 'not-a-valid-ref\n' > "$TEST2_DIR/.claude/session-base-commit"
+printf 'test-session\n' > "$TEST2_DIR/.claude/current-session"
+mkdir -p "$TEST2_DIR/.claude/sessions/test-session"
+cat > "$TEST2_DIR/.claude/sessions/test-session/session.json" <<'EOF'
+{"base_commit":"not-a-valid-ref"}
+EOF
 OUTPUT="$(run_gate "$TEST2_DIR" 2>&1 || true)"
 if printf '%s' "$OUTPUT" | grep -Eq 'FAIL|ERROR'; then
   echo "PASS: invalid session-base-commit blocks the architecture gate"
@@ -57,7 +62,11 @@ fi
 TEST3_DIR="$TMPDIR_BASE/valid"
 make_repo "$TEST3_DIR"
 BASE_COMMIT="$(cd "$TEST3_DIR" && git rev-parse HEAD)"
-printf '%s\n' "$BASE_COMMIT" > "$TEST3_DIR/.claude/session-base-commit"
+printf 'test-session\n' > "$TEST3_DIR/.claude/current-session"
+mkdir -p "$TEST3_DIR/.claude/sessions/test-session"
+cat > "$TEST3_DIR/.claude/sessions/test-session/session.json" <<EOF
+{"base_commit":"$BASE_COMMIT"}
+EOF
 printf 'delta\n' >> "$TEST3_DIR/tracked.txt"
 (cd "$TEST3_DIR" && git add tracked.txt && git commit -m "change" -q)
 OUTPUT="$(run_gate "$TEST3_DIR" 2>&1 || true)"

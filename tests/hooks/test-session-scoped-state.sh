@@ -147,4 +147,45 @@ else
   exit 1
 fi
 
+ARCH_TEST_DIR="$TMPDIR_BASE/arch-review-persist"
+mkdir -p "$ARCH_TEST_DIR/.claude/sessions/test-session" "$ARCH_TEST_DIR/hooks/scripts"
+cp "$PROJECT_DIR/hooks/scripts/codex-architecture-gate.sh" "$ARCH_TEST_DIR/hooks/scripts/"
+cp "$SESSION_UTIL" "$ARCH_TEST_DIR/hooks/scripts/"
+cat > "$ARCH_TEST_DIR/hooks/scripts/codex-adversarial-review.sh" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' '{"status":"FAIL","summary":"stub review","blocking_issues":["issue"],"fix_instructions":["fix"]}'
+EOF
+chmod +x "$ARCH_TEST_DIR/hooks/scripts/codex-adversarial-review.sh"
+printf 'test-session' > "$ARCH_TEST_DIR/.claude/current-session"
+cat > "$ARCH_TEST_DIR/.claude/sessions/test-session/session.json" <<'EOF'
+{"base_commit":""}
+EOF
+
+(
+  cd "$ARCH_TEST_DIR"
+  git init -q
+  git config user.name "Test User"
+  git config user.email "test@example.com"
+  printf 'one\n' > file1.txt
+  printf 'two\n' > file2.txt
+  printf 'three\n' > file3.txt
+  git add file1.txt file2.txt file3.txt
+  git commit -m "init" -q
+  printf 'delta\n' >> file1.txt
+  printf 'delta\n' >> file2.txt
+  printf 'delta\n' >> file3.txt
+  printf '{"stop_hook_active":false}\n' | CLAUDE_PROJECT_DIR="$ARCH_TEST_DIR" bash hooks/scripts/codex-architecture-gate.sh >/dev/null 2>&1 || true
+)
+
+SESSION_REVIEW_FILE="$ARCH_TEST_DIR/.claude/sessions/test-session/architecture-review.json"
+LEGACY_REVIEW_FILE="$ARCH_TEST_DIR/.claude/last-adversarial-review.json"
+if [[ -f "$SESSION_REVIEW_FILE" ]] && [[ -f "$LEGACY_REVIEW_FILE" ]] \
+  && jq -e '.summary == "stub review"' "$SESSION_REVIEW_FILE" >/dev/null 2>&1 \
+  && jq -e '.summary == "stub review"' "$LEGACY_REVIEW_FILE" >/dev/null 2>&1; then
+  echo "PASS: architecture gate persists captured review JSON to session and legacy files"
+else
+  echo "FAIL: architecture gate did not persist captured review JSON"
+  exit 1
+fi
+
 echo "=== All session scoped state tests passed ==="

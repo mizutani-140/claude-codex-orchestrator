@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR_IMPL="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR_IMPL/session-util.sh" 2>/dev/null || true
+
+# session-scoped 出力先（legacy fallback あり）
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-OUT_FILE="$PROJECT_DIR/.claude/last-implementation-result.json"
+SESSION_OUT_DIR="$(ensure_session_dir 2>/dev/null || echo "$PROJECT_DIR/.claude")"
+OUT_FILE="$SESSION_OUT_DIR/implementation.json"
+LEGACY_OUT_FILE="$PROJECT_DIR/.claude/last-implementation-result.json"
 mkdir -p "$PROJECT_DIR/.claude"
 
 if ! command -v codex >/dev/null 2>&1; then
   echo '{"status":"ERROR","summary":"codex command not found","changed_files":[],"tests_run":[],"tests_status":"NOT_RUN","test_log":"","remaining_risks":["Codex CLI missing"]}' | tee "$OUT_FILE"
+  if [[ "$OUT_FILE" != "$LEGACY_OUT_FILE" ]]; then
+    cp "$OUT_FILE" "$LEGACY_OUT_FILE" 2>/dev/null || true
+  fi
   exit 0
 fi
 
@@ -14,6 +23,9 @@ TASK_TEXT="$(cat)"
 
 if [[ -z "${TASK_TEXT// }" ]]; then
   echo '{"status":"ERROR","summary":"implementation task is empty","changed_files":[],"tests_run":[],"tests_status":"NOT_RUN","test_log":"","remaining_risks":["Empty task"]}' | tee "$OUT_FILE"
+  if [[ "$OUT_FILE" != "$LEGACY_OUT_FILE" ]]; then
+    cp "$OUT_FILE" "$LEGACY_OUT_FILE" 2>/dev/null || true
+  fi
   exit 0
 fi
 
@@ -206,3 +218,7 @@ if ! is_valid_json "$RESULT"; then
 fi
 
 echo "$RESULT" | tee "$OUT_FILE"
+# Legacy copy for backward compatibility
+if [[ "$OUT_FILE" != "$LEGACY_OUT_FILE" ]]; then
+  cp "$OUT_FILE" "$LEGACY_OUT_FILE" 2>/dev/null || true
+fi

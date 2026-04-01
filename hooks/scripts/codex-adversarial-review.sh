@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/session-util.sh" 2>/dev/null || true
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-OUT_FILE="$PROJECT_DIR/.claude/last-adversarial-review.json"
+SESSION_OUT_DIR="$(ensure_session_dir 2>/dev/null || echo "$PROJECT_DIR/.claude")"
+OUT_FILE="$SESSION_OUT_DIR/architecture-review.json"
+LEGACY_OUT_FILE="$PROJECT_DIR/.claude/last-adversarial-review.json"
 mkdir -p "$PROJECT_DIR/.claude"
 
 if ! command -v codex >/dev/null 2>&1; then
   echo '{"status":"ERROR","summary":"codex command not found","blocking_issues":["Codex CLI missing"],"fix_instructions":["Install or configure Codex CLI"]}' | tee "$OUT_FILE"
+  if [[ "$OUT_FILE" != "$LEGACY_OUT_FILE" ]]; then
+    cp "$OUT_FILE" "$LEGACY_OUT_FILE" 2>/dev/null || true
+  fi
   exit 0
 fi
 
@@ -19,14 +25,14 @@ PREVIOUS_REVIEW_CONTEXT=""
 
 # Fallback: if unstaged diff is empty, check session-base-commit for committed changes
 if [[ -z "$DIFF" ]]; then
-  BASE_COMMIT_FILE="$PROJECT_DIR/.claude/session-base-commit"
-  if [[ -f "$BASE_COMMIT_FILE" ]]; then
-    BASE_COMMIT="$(cat "$BASE_COMMIT_FILE")"
+  BASE_COMMIT="$(get_session_base_commit 2>/dev/null || echo "")"
+  if [[ -n "$BASE_COMMIT" ]]; then
     if git rev-parse --verify "${BASE_COMMIT}^{commit}" >/dev/null 2>&1; then
       DIFF="$(git diff "$BASE_COMMIT"...HEAD 2>/dev/null || true)"
       DIFF_STAT="$(git diff --stat "$BASE_COMMIT"...HEAD 2>/dev/null || true)"
     else
-      echo '{"status":"ERROR","summary":"session-base-commit contains invalid ref","blocking_issues":["Invalid baseline ref"],"fix_instructions":["Run session-start.sh to record a valid base commit"]}' | tee "$OUT_FILE"
+      echo '{"status":"ERROR","summary":"session base commit is invalid","blocking_issues":["Invalid baseline ref"],"fix_instructions":["Run session-start.sh"]}' | tee "$OUT_FILE"
+      [[ "$OUT_FILE" != "$LEGACY_OUT_FILE" ]] && cp "$OUT_FILE" "$LEGACY_OUT_FILE" 2>/dev/null || true
       exit 0
     fi
   fi
@@ -36,6 +42,7 @@ DIFF_FOR_REVIEW="$DIFF"
 
 if [[ -z "$DIFF" ]]; then
   echo '{"status":"PASS","summary":"No diff to review","blocking_issues":[],"fix_instructions":[]}' | tee "$OUT_FILE"
+  [[ "$OUT_FILE" != "$LEGACY_OUT_FILE" ]] && cp "$OUT_FILE" "$LEGACY_OUT_FILE" 2>/dev/null || true
   exit 0
 fi
 
@@ -177,3 +184,6 @@ if ! is_valid_json "$RESULT"; then
 fi
 
 echo "$RESULT" | tee "$OUT_FILE"
+if [[ "$OUT_FILE" != "$LEGACY_OUT_FILE" ]]; then
+  cp "$OUT_FILE" "$LEGACY_OUT_FILE" 2>/dev/null || true
+fi

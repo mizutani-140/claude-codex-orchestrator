@@ -110,10 +110,17 @@ _read_session_json_base_commit() {
 }
 
 get_session_base_commit() {
-  local base_commit legacy_path
+  local base_commit session_id legacy_path
   base_commit="$(_read_session_json_base_commit)"
   if [[ -n "$base_commit" ]]; then
     printf '%s\n' "$base_commit"
+    return 0
+  fi
+
+  session_id="$(get_session_id)"
+  if [[ -n "$session_id" ]]; then
+    # Active session with empty base_commit: return empty, do not use legacy
+    printf '%s' ""
     return 0
   fi
 

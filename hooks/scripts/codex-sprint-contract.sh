@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/session-util.sh" 2>/dev/null || true
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-OUT_FILE="$PROJECT_DIR/.claude/last-sprint-contract.json"
+SESSION_OUT_DIR="$(ensure_session_dir 2>/dev/null || echo "$PROJECT_DIR/.claude")"
+OUT_FILE="$SESSION_OUT_DIR/sprint-contract.json"
+LEGACY_OUT_FILE="$PROJECT_DIR/.claude/last-sprint-contract.json"
 mkdir -p "$PROJECT_DIR/.claude"
 
 if ! command -v codex >/dev/null 2>&1; then
   echo '{"feature_id":"unknown","done_criteria":[],"test_plan":[],"boundary_tests_required":[],"error":"codex not found"}' | tee "$OUT_FILE"
+  if [[ "$OUT_FILE" != "$LEGACY_OUT_FILE" ]]; then
+    cp "$OUT_FILE" "$LEGACY_OUT_FILE" 2>/dev/null || true
+  fi
   exit 0
 fi
 
@@ -14,6 +20,9 @@ TASK_TEXT="$(cat)"
 
 if [[ -z "${TASK_TEXT// }" ]]; then
   echo '{"feature_id":"unknown","done_criteria":[],"test_plan":[],"boundary_tests_required":[],"error":"empty input"}' | tee "$OUT_FILE"
+  if [[ "$OUT_FILE" != "$LEGACY_OUT_FILE" ]]; then
+    cp "$OUT_FILE" "$LEGACY_OUT_FILE" 2>/dev/null || true
+  fi
   exit 0
 fi
 
@@ -129,3 +138,6 @@ if ! is_valid_json "$RESULT"; then
 fi
 
 echo "$RESULT" | tee "$OUT_FILE"
+if [[ "$OUT_FILE" != "$LEGACY_OUT_FILE" ]]; then
+  cp "$OUT_FILE" "$LEGACY_OUT_FILE" 2>/dev/null || true
+fi

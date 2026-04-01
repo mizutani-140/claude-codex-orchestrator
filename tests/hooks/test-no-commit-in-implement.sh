@@ -39,19 +39,19 @@ else
   exit 1
 fi
 
-# Test 5: architecture gate has base-commit fallback
-if grep -q 'session-base-commit' "$PROJECT_DIR/hooks/scripts/codex-architecture-gate.sh"; then
-  echo "PASS: architecture gate has base-commit fallback"
+# Test 5: architecture gate uses shared session base-commit helper
+if grep -q 'get_session_base_commit' "$PROJECT_DIR/hooks/scripts/codex-architecture-gate.sh"; then
+  echo "PASS: architecture gate uses shared session base-commit helper"
 else
-  echo "FAIL: architecture gate missing base-commit fallback"
+  echo "FAIL: architecture gate missing shared session base-commit helper"
   exit 1
 fi
 
-# Test 6: adversarial review has base-commit fallback
-if grep -q 'session-base-commit' "$PROJECT_DIR/hooks/scripts/codex-adversarial-review.sh"; then
-  echo "PASS: adversarial review has base-commit fallback"
+# Test 6: adversarial review uses shared session base-commit helper
+if grep -q 'get_session_base_commit' "$PROJECT_DIR/hooks/scripts/codex-adversarial-review.sh"; then
+  echo "PASS: adversarial review uses shared session base-commit helper"
 else
-  echo "FAIL: adversarial review missing base-commit fallback"
+  echo "FAIL: adversarial review missing shared session base-commit helper"
   exit 1
 fi
 
