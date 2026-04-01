@@ -11,12 +11,9 @@
     {
       "id": "harness-constraints",
       "title": "Strongly-worded constraints in CLAUDE.md and agent definitions",
-      "status": "pending",
-      "passes": false,
-      "acceptance": "CLAUDE.md uses 'It is unacceptable to...' format, agent definitions include session/test/commit rules",
-      "depends_on": [
-        "harness-foundation"
-      ]
+      "status": "done",
+      "passes": true,
+      "acceptance": "CLAUDE.md uses 'It is unacceptable to...' format, agent definitions include session/test/commit rules"
     },
     {
       "id": "harness-hooks",
