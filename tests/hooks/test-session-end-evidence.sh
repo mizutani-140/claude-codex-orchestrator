@@ -87,6 +87,83 @@ TEST5="$TMPDIR_BASE/test5"
 mkdir -p "$TEST5"
 setup_test_env "$TEST5"
 cd "$TEST5"
+echo '{"status":"PASS"}' > "$TEST5/.claude/last-eval-gate.json"
+echo '{"status":"PASS"}' > "$TEST5/.claude/last-adversarial-review.json"
+rm -f "$TEST5/session-util.sh" 2>/dev/null || true
+bash session-end.sh "Did stuff" "More" "None" "feat1" "success" "8 tests passed" 2>/dev/null || true
+STATUS="$(jq -r '.features[0].status' feature-list.json)"
+if [[ "$STATUS" == "needs-review" ]]; then
+  echo "PASS: active session ignores legacy PASS even without session-util.sh"
+else
+  echo "FAIL: expected needs-review, got $STATUS (cross-session contamination)"
+  exit 1
+fi
+
+# Test 6: NO current-session + legacy PASS -> done (backward compat)
+TEST6="$TMPDIR_BASE/test6"
+mkdir -p "$TEST6"
+setup_test_env "$TEST6"
+cd "$TEST6"
+echo '{"status":"PASS"}' > "$TEST6/.claude/last-eval-gate.json"
+echo '{"status":"PASS"}' > "$TEST6/.claude/last-adversarial-review.json"
+rm -f "$TEST6/.claude/current-session" 2>/dev/null || true
+bash session-end.sh "Did stuff" "Nothing" "None" "feat1" "success" "8 tests passed" 2>/dev/null || true
+STATUS="$(jq -r '.features[0].status' feature-list.json)"
+PASSES="$(jq -r '.features[0].passes' feature-list.json)"
+if [[ "$STATUS" == "done" && "$PASSES" == "true" ]]; then
+  echo "PASS: no session + legacy PASS -> done (backward compat)"
+else
+  echo "FAIL: expected done/true, got $STATUS/$PASSES"
+  exit 1
+fi
+
+# Test 7: CRLF current-session still resolves correct session dir
+TEST7="$TMPDIR_BASE/test7"
+mkdir -p "$TEST7"
+setup_test_env "$TEST7"
+cd "$TEST7"
+SESSION_ID="crlf-sess"
+printf "${SESSION_ID}\r\n" > "$TEST7/.claude/current-session"
+mkdir -p "$TEST7/.claude/sessions/$SESSION_ID"
+echo '{"status":"PASS"}' > "$TEST7/.claude/sessions/$SESSION_ID/eval-gate.json"
+echo '{"status":"PASS"}' > "$TEST7/.claude/sessions/$SESSION_ID/architecture-review.json"
+git add -A && git commit -m "add crlf session" -q 2>/dev/null || true
+bash session-end.sh "Did stuff" "More" "None" "feat1" "success" "8 tests passed" 2>/dev/null || true
+STATUS="$(jq -r '.features[0].status' feature-list.json)"
+PASSES="$(jq -r '.features[0].passes' feature-list.json)"
+if [[ "$STATUS" == "done" && "$PASSES" == "true" ]]; then
+  echo "PASS: CRLF current-session correctly resolved session dir"
+else
+  echo "FAIL: CRLF current-session misresolved, got $STATUS/$PASSES (expected done/true)"
+  exit 1
+fi
+
+# Test 8: multi-line current-session uses first line only
+TEST8="$TMPDIR_BASE/test8"
+mkdir -p "$TEST8"
+setup_test_env "$TEST8"
+cd "$TEST8"
+SESSION_ID="first-line-sess"
+printf "${SESSION_ID}\ngarbage-second-line\n" > "$TEST8/.claude/current-session"
+mkdir -p "$TEST8/.claude/sessions/$SESSION_ID"
+echo '{"status":"PASS"}' > "$TEST8/.claude/sessions/$SESSION_ID/eval-gate.json"
+echo '{"status":"PASS"}' > "$TEST8/.claude/sessions/$SESSION_ID/architecture-review.json"
+git add -A && git commit -m "add multiline session" -q 2>/dev/null || true
+bash session-end.sh "Did stuff" "More" "None" "feat1" "success" "8 tests passed" 2>/dev/null || true
+STATUS="$(jq -r '.features[0].status' feature-list.json)"
+PASSES="$(jq -r '.features[0].passes' feature-list.json)"
+if [[ "$STATUS" == "done" && "$PASSES" == "true" ]]; then
+  echo "PASS: multi-line current-session uses first line only"
+else
+  echo "FAIL: multi-line current-session misresolved, got $STATUS/$PASSES (expected done/true)"
+  exit 1
+fi
+
+# Test 9: failed -> blocked
+TEST9="$TMPDIR_BASE/test9"
+mkdir -p "$TEST9"
+setup_test_env "$TEST9"
+cd "$TEST9"
 bash session-end.sh "Failed" "Investigate" "Build broken" "feat1" "failed" "" 2>/dev/null || true
 STATUS="$(jq -r '.features[0].status' feature-list.json)"
 if [[ "$STATUS" == "blocked" ]]; then

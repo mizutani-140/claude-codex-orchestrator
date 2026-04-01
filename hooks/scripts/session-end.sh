@@ -58,62 +58,52 @@ if [[ -n "$FEATURE_ID" ]] && [[ -f feature-list.json ]] && command -v jq >/dev/n
   FINAL_STATUS="needs-review"
 
   if [[ "$SESSION_RESULT" == "success" && -n "$TEST_EVIDENCE" ]]; then
-    EVAL_GATE_FILE=""
-    ARCH_REVIEW_FILE=""
-    SESSION_SCOPED_GATES=false
-
-    if declare -F session_file >/dev/null 2>&1; then
-      EVAL_GATE_FILE="$(session_file "eval-gate.json" 2>/dev/null || echo "")"
-      ARCH_REVIEW_FILE="$(session_file "architecture-review.json" 2>/dev/null || echo "")"
-      if declare -F get_session_id >/dev/null 2>&1 && [[ -n "$(get_session_id 2>/dev/null || echo "")" ]]; then
-        SESSION_SCOPED_GATES=true
-      fi
+    SESSION_ID_SNAPSHOT=""
+    CURRENT_SESSION_FILE="$PROJECT_DIR/.claude/current-session"
+    if [[ -f "$CURRENT_SESSION_FILE" ]]; then
+      SESSION_ID_SNAPSHOT="$(head -1 "$CURRENT_SESSION_FILE" 2>/dev/null | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' || echo "")"
     fi
 
     EVAL_PASS=false
     ARCH_PASS=false
 
-    if [[ -n "$EVAL_GATE_FILE" && -f "$EVAL_GATE_FILE" ]]; then
-      EVAL_STATUS="$(jq -r '.status // "UNKNOWN"' "$EVAL_GATE_FILE" 2>/dev/null || echo "UNKNOWN")"
-      if [[ "$EVAL_STATUS" == "PASS" ]]; then
-        EVAL_PASS=true
-      fi
-    else
-      if [[ "$SESSION_SCOPED_GATES" == "true" ]]; then
-        # Active session: do NOT fall back to legacy (cross-session contamination risk)
-        EVAL_PASS=false
-      else
-        # No session: check legacy location
-        LEGACY_EVAL="$PROJECT_DIR/.claude/last-eval-gate.json"
-        if [[ -f "$LEGACY_EVAL" ]]; then
-          EVAL_STATUS="$(jq -r '.status // "UNKNOWN"' "$LEGACY_EVAL" 2>/dev/null || echo "UNKNOWN")"
-          if [[ "$EVAL_STATUS" == "PASS" ]]; then
-            EVAL_PASS=true
-          fi
-        else
+    if [[ -n "$SESSION_ID_SNAPSHOT" ]]; then
+      SESSION_DIR="$PROJECT_DIR/.claude/sessions/$SESSION_ID_SNAPSHOT"
+
+      EVAL_GATE_FILE="$SESSION_DIR/eval-gate.json"
+      if [[ -f "$EVAL_GATE_FILE" ]]; then
+        EVAL_STATUS="$(jq -r '.status // "UNKNOWN"' "$EVAL_GATE_FILE" 2>/dev/null || echo "UNKNOWN")"
+        if [[ "$EVAL_STATUS" == "PASS" ]]; then
           EVAL_PASS=true
         fi
       fi
-    fi
 
-    if [[ -n "$ARCH_REVIEW_FILE" && -f "$ARCH_REVIEW_FILE" ]]; then
-      ARCH_STATUS="$(jq -r '.status // "UNKNOWN"' "$ARCH_REVIEW_FILE" 2>/dev/null || echo "UNKNOWN")"
-      if [[ "$ARCH_STATUS" == "PASS" ]]; then
-        ARCH_PASS=true
-      fi
-    else
-      if [[ "$SESSION_SCOPED_GATES" == "true" ]]; then
-        ARCH_PASS=false
-      else
-        LEGACY_ARCH="$PROJECT_DIR/.claude/last-adversarial-review.json"
-        if [[ -f "$LEGACY_ARCH" ]]; then
-          ARCH_STATUS="$(jq -r '.status // "UNKNOWN"' "$LEGACY_ARCH" 2>/dev/null || echo "UNKNOWN")"
-          if [[ "$ARCH_STATUS" == "PASS" ]]; then
-            ARCH_PASS=true
-          fi
-        else
+      ARCH_REVIEW_FILE="$SESSION_DIR/architecture-review.json"
+      if [[ -f "$ARCH_REVIEW_FILE" ]]; then
+        ARCH_STATUS="$(jq -r '.status // "UNKNOWN"' "$ARCH_REVIEW_FILE" 2>/dev/null || echo "UNKNOWN")"
+        if [[ "$ARCH_STATUS" == "PASS" ]]; then
           ARCH_PASS=true
         fi
+      fi
+    else
+      LEGACY_EVAL="$PROJECT_DIR/.claude/last-eval-gate.json"
+      if [[ -f "$LEGACY_EVAL" ]]; then
+        EVAL_STATUS="$(jq -r '.status // "UNKNOWN"' "$LEGACY_EVAL" 2>/dev/null || echo "UNKNOWN")"
+        if [[ "$EVAL_STATUS" == "PASS" ]]; then
+          EVAL_PASS=true
+        fi
+      else
+        EVAL_PASS=true
+      fi
+
+      LEGACY_ARCH="$PROJECT_DIR/.claude/last-adversarial-review.json"
+      if [[ -f "$LEGACY_ARCH" ]]; then
+        ARCH_STATUS="$(jq -r '.status // "UNKNOWN"' "$LEGACY_ARCH" 2>/dev/null || echo "UNKNOWN")"
+        if [[ "$ARCH_STATUS" == "PASS" ]]; then
+          ARCH_PASS=true
+        fi
+      else
+        ARCH_PASS=true
       fi
     fi
 
