@@ -63,7 +63,7 @@ if [[ -f "$SETTINGS_TEMPLATE" ]]; then
     jq --argjson hooks "$TEMPLATE_HOOKS" '
       .hooks = $hooks |
       if .permissions.allow then
-        .permissions.allow |= [.[] | select(test("^Bash\\((bash|[A-Z_]+=.*bash):\\*\\)$") | not)]
+        .permissions.allow |= [.[] | select(test("bash:\\*\\)$") | not)]
       else . end
     ' "$SETTINGS_LOCAL" > "${SETTINGS_LOCAL}.tmp" \
       && mv "${SETTINGS_LOCAL}.tmp" "$SETTINGS_LOCAL"

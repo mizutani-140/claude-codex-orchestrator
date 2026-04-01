@@ -26,7 +26,7 @@ run_settings_sync() {
       jq --argjson hooks "$TEMPLATE_HOOKS" '
         .hooks = $hooks |
         if .permissions.allow then
-          .permissions.allow |= [.[] | select(test("^Bash\\((bash|[A-Z_]+=.*bash):\\*\\)$") | not)]
+          .permissions.allow |= [.[] | select(test("bash:\\*\\)$") | not)]
         else . end
       ' "$settings_local" > "${settings_local}.tmp" \
         && mv "${settings_local}.tmp" "$settings_local"
@@ -177,10 +177,10 @@ else
   fail "init.sh missing jq-missing warning"
 fi
 
-if grep -q 'select(test.*Bash' "$REAL_PROJECT_DIR/hooks/scripts/init.sh"; then
-  pass "init.sh strips broad Bash wildcard permissions"
+if grep -Fq 'test("bash:\\*\\)$") | not' "$REAL_PROJECT_DIR/hooks/scripts/init.sh"; then
+  pass "init.sh uses the new broad Bash wildcard regex"
 else
-  fail "init.sh does not strip broad Bash wildcard permissions"
+  fail "init.sh does not use the new broad Bash wildcard regex"
 fi
 
 # --- Test 6: Broad Bash wildcards are stripped during sync ---
@@ -220,6 +220,44 @@ else
   pass "broad Bash(CLAUDE_PROJECT_DIR=... bash:*) stripped successfully"
 fi
 rm -rf "$TMPDIR6"
+
+# --- Test 7: Lowercase env prefix Bash wildcard stripped ---
+TMPDIR7="$(setup_temp_repo)"
+cat > "$TMPDIR7/.claude/settings.local.json" <<'LOWER'
+{
+  "permissions": {
+    "allow": [
+      "Bash(some_var=value bash:*)",
+      "Bash(git:*)",
+      "Bash(normal_permission)",
+      "Bash(bash:*)"
+    ]
+  },
+  "hooks": {}
+}
+LOWER
+
+run_settings_sync "$TMPDIR7"
+
+REMAINING7="$(jq -r '.permissions.allow[]' "$TMPDIR7/.claude/settings.local.json" 2>/dev/null)"
+if echo "$REMAINING7" | grep -q 'Bash(git:\*)' && echo "$REMAINING7" | grep -q 'Bash(normal_permission)'; then
+  pass "non-wildcard Bash permissions preserved with lowercase prefix"
+else
+  fail "non-wildcard Bash permissions were incorrectly stripped with lowercase prefix"
+fi
+
+if echo "$REMAINING7" | grep -q 'some_var=value bash:\*'; then
+  fail "lowercase env prefix Bash(some_var=value bash:*) was not stripped"
+else
+  pass "lowercase env prefix Bash(some_var=value bash:*) stripped successfully"
+fi
+
+if echo "$REMAINING7" | grep -q 'Bash(bash:\*)'; then
+  fail "Bash(bash:*) was not stripped"
+else
+  pass "Bash(bash:*) stripped with new regex"
+fi
+rm -rf "$TMPDIR7"
 
 # --- Results ---
 echo ""

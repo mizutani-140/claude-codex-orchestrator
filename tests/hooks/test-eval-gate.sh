@@ -105,4 +105,85 @@ else
   exit 1
 fi
 
+# Test 10: resolver missing -> FAIL (fail-closed)
+TEST_DIR_NO_RESOLVER="$TMPDIR_BASE/test-no-resolver"
+mkdir -p "$TEST_DIR_NO_RESOLVER/.claude" "$TEST_DIR_NO_RESOLVER/hooks/scripts"
+# Do NOT create boundary-test-resolver.sh
+echo '{"status":"DONE","tests_status":"PASS","test_log":"all tests passed","changed_files":["src/foo.ts"],"tests_run":["unit-test"]}' > "$TEST_DIR_NO_RESOLVER/.claude/last-implementation-result.json"
+REAL_RESOLVER="$PROJECT_DIR/hooks/scripts/boundary-test-resolver.sh"
+REAL_RESOLVER_BAK="$TMPDIR_BASE/boundary-test-resolver.sh.bak"
+mv "$REAL_RESOLVER" "$REAL_RESOLVER_BAK"
+trap 'mv "$REAL_RESOLVER_BAK" "$REAL_RESOLVER" 2>/dev/null || true; rm -rf "$TMPDIR_BASE"' EXIT
+OUTPUT_NR="$(CLAUDE_PROJECT_DIR="$TEST_DIR_NO_RESOLVER" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
+mv "$REAL_RESOLVER_BAK" "$REAL_RESOLVER"
+trap 'rm -rf "$TMPDIR_BASE"' EXIT
+if echo "$OUTPUT_NR" | grep -q 'boundary-test-resolver.sh not found'; then
+  echo "PASS: resolver missing triggers FAIL (fail-closed)"
+else
+  echo "FAIL: resolver missing should trigger FAIL (output: $OUTPUT_NR)"
+  exit 1
+fi
+
+# Test 11: resolver exits non-zero -> structured FAIL (not script abort)
+TEST_DIR_REXNZ="$TMPDIR_BASE/test-resolver-nonzero"
+mkdir -p "$TEST_DIR_REXNZ/.claude"
+REAL_RESOLVER="$PROJECT_DIR/hooks/scripts/boundary-test-resolver.sh"
+REAL_RESOLVER_BAK_REXNZ="$TMPDIR_BASE/boundary-test-resolver.sh.rexnz.bak"
+cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_REXNZ"
+cat > "$REAL_RESOLVER" << 'RESOLVER'
+#!/usr/bin/env bash
+exit 1
+RESOLVER
+chmod +x "$REAL_RESOLVER"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"all tests passed","changed_files":["src/foo.ts"],"tests_run":["unit-test"]}' > "$TEST_DIR_REXNZ/.claude/last-implementation-result.json"
+OUTPUT_REXNZ="$(CLAUDE_PROJECT_DIR="$TEST_DIR_REXNZ" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
+mv "$REAL_RESOLVER_BAK_REXNZ" "$REAL_RESOLVER"
+if echo "$OUTPUT_REXNZ" | grep -q 'boundary-test-resolver.sh failed with exit code'; then
+  echo "PASS: resolver non-zero exit produces structured FAIL"
+else
+  echo "FAIL: resolver non-zero exit did not produce structured FAIL (output: $OUTPUT_REXNZ)"
+  exit 1
+fi
+
+# Test 12: partial-name collision does not satisfy boundary check (exact match required)
+TEST_DIR_PARTIAL="$TMPDIR_BASE/test-partial-match"
+mkdir -p "$TEST_DIR_PARTIAL/.claude"
+REAL_RESOLVER_BAK_PARTIAL="$TMPDIR_BASE/boundary-test-resolver.sh.partial.bak"
+cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_PARTIAL"
+cat > "$REAL_RESOLVER" << 'RESOLVER'
+#!/usr/bin/env bash
+echo '["api-test"]'
+RESOLVER
+chmod +x "$REAL_RESOLVER"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"all tests passed","changed_files":["src/api.ts"],"tests_run":["not-api-test-related","other-test"]}' > "$TEST_DIR_PARTIAL/.claude/last-implementation-result.json"
+OUTPUT_PARTIAL="$(CLAUDE_PROJECT_DIR="$TEST_DIR_PARTIAL" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
+mv "$REAL_RESOLVER_BAK_PARTIAL" "$REAL_RESOLVER"
+if echo "$OUTPUT_PARTIAL" | grep -q 'boundary tests not run'; then
+  echo "PASS: partial-name collision does not satisfy boundary check"
+else
+  echo "FAIL: partial-name collision falsely satisfied boundary check (output: $OUTPUT_PARTIAL)"
+  exit 1
+fi
+
+# Test 13: exact match does pass boundary check
+TEST_DIR_EXACT="$TMPDIR_BASE/test-exact-match"
+mkdir -p "$TEST_DIR_EXACT/.claude"
+REAL_RESOLVER_BAK_EXACT="$TMPDIR_BASE/boundary-test-resolver.sh.exact.bak"
+cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_EXACT"
+cat > "$REAL_RESOLVER" << 'RESOLVER'
+#!/usr/bin/env bash
+echo '["api-test"]'
+RESOLVER
+chmod +x "$REAL_RESOLVER"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"all tests passed","changed_files":["src/api.ts"],"tests_run":["api-test","unit-test"]}' > "$TEST_DIR_EXACT/.claude/last-implementation-result.json"
+OUTPUT_EXACT="$(CLAUDE_PROJECT_DIR="$TEST_DIR_EXACT" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
+mv "$REAL_RESOLVER_BAK_EXACT" "$REAL_RESOLVER"
+EXACT_STATUS="$(echo "$OUTPUT_EXACT" | head -1 | jq -r '.status // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")"
+if [[ "$EXACT_STATUS" == "PASS" ]]; then
+  echo "PASS: exact match passes boundary check"
+else
+  echo "FAIL: exact match did not pass boundary check (output: $OUTPUT_EXACT)"
+  exit 1
+fi
+
 echo "=== All eval gate tests passed ==="

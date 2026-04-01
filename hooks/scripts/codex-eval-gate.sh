@@ -73,17 +73,28 @@ if [[ -n "$CONTRACT_CONTENT" ]]; then
   : # Contract exists but verification is deferred to future enhancement
 fi
 
-# Check 5: boundary test verification (post-implementation) — BLOCKING
+# Check 5: boundary test verification (fail-closed)
 CHANGED_FILES="$(echo "$IMPL" | jq -r '.changed_files[]? // empty' 2>/dev/null || echo "")"
 if [[ -n "$CHANGED_FILES" ]]; then
   SCRIPT_DIR_EVAL="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  if [[ -x "$SCRIPT_DIR_EVAL/boundary-test-resolver.sh" ]]; then
-    REQUIRED_BOUNDARY="$(echo "$CHANGED_FILES" | bash "$SCRIPT_DIR_EVAL/boundary-test-resolver.sh" 2>/dev/null || echo "[]")"
-    if [[ "$REQUIRED_BOUNDARY" != "[]" ]]; then
-      TESTS_RUN="$(echo "$IMPL" | jq -r '.tests_run[]? // empty' 2>/dev/null || echo "")"
+  RESOLVER="$SCRIPT_DIR_EVAL/boundary-test-resolver.sh"
+  if [[ ! -x "$RESOLVER" ]]; then
+    FAILURES+=("boundary-test-resolver.sh not found or not executable")
+  else
+    if REQUIRED_BOUNDARY="$(echo "$CHANGED_FILES" | bash "$RESOLVER" 2>/dev/null)"; then
+      RESOLVER_EXIT=0
+    else
+      RESOLVER_EXIT=$?
+    fi
+    if [[ $RESOLVER_EXIT -ne 0 ]]; then
+      FAILURES+=("boundary-test-resolver.sh failed with exit code $RESOLVER_EXIT")
+    elif ! echo "$REQUIRED_BOUNDARY" | jq -e 'type == "array"' >/dev/null 2>&1; then
+      FAILURES+=("boundary-test-resolver.sh returned invalid JSON: $REQUIRED_BOUNDARY")
+    elif [[ "$REQUIRED_BOUNDARY" != "[]" ]]; then
+      TESTS_RUN_JSON="$(echo "$IMPL" | jq '[.tests_run[]? // empty]' 2>/dev/null || echo "[]")"
       MISSING_BOUNDARY=""
       for bt in $(echo "$REQUIRED_BOUNDARY" | jq -r '.[]' 2>/dev/null); do
-        if ! echo "$TESTS_RUN" | grep -qi "$bt"; then
+        if ! echo "$TESTS_RUN_JSON" | jq -e --arg bt "$bt" 'any(.[]; . == $bt)' >/dev/null 2>&1; then
           MISSING_BOUNDARY="$MISSING_BOUNDARY $bt"
         fi
       done
