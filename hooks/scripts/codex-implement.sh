@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR_IMPL="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR_IMPL/session-util.sh" 2>/dev/null || true
+source "$SCRIPT_DIR_IMPL/model-router.sh" 2>/dev/null || true
 
 # session-scoped 出力先（legacy fallback あり）
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
@@ -120,7 +121,7 @@ $TASK_TEXT
 --- TASK END ---
 EOF
 )"
-  if codex exec -m gpt-5.4 -c model_reasoning_effort="high" --sandbox workspace-write --full-auto --output-last-message "$tmp_out" "$prompt" >/dev/null 2>"$tmp_err"; then
+  if codex exec -m "$CODEX_MODEL_IMPLEMENT" -c model_reasoning_effort="$CODEX_REASONING_EFFORT" --sandbox workspace-write --full-auto --output-last-message "$tmp_out" "$prompt" >/dev/null 2>"$tmp_err"; then
     exit_code=0
   else
     exit_code=$?
@@ -129,7 +130,7 @@ EOF
   RESULT="$(cat "$tmp_out" 2>/dev/null || echo "")"
 
   if [[ ! -s "$tmp_out" ]] || { [[ "$exit_code" -ne 0 ]] && stderr_indicates_output_last_message_unsupported "$LAST_CODEX_STDERR"; }; then
-    if codex exec -m gpt-5.4 -c model_reasoning_effort="high" --sandbox workspace-write --full-auto "$prompt" >"$tmp_out" 2>"$tmp_err"; then
+    if codex exec -m "$CODEX_MODEL_IMPLEMENT" -c model_reasoning_effort="$CODEX_REASONING_EFFORT" --sandbox workspace-write --full-auto "$prompt" >"$tmp_out" 2>"$tmp_err"; then
       exit_code=0
     else
       exit_code=$?
@@ -183,14 +184,14 @@ Return JSON only. No markdown fences. Use exactly this schema:
 
 Set status to PARTIAL since tests were not re-executed in this retry."
 
-  if codex exec -m gpt-5.4-mini --sandbox read-only --full-auto --output-last-message "$tmp_out" "$prompt" >/dev/null 2>"$tmp_err"; then
+  if codex exec -m "$CODEX_MODEL_RETRY" --sandbox read-only --full-auto --output-last-message "$tmp_out" "$prompt" >/dev/null 2>"$tmp_err"; then
     true
   else
     true
   fi
   RESULT="$(cat "$tmp_out" 2>/dev/null || echo "")"
   if [[ ! -s "$tmp_out" ]]; then
-    if codex exec -m gpt-5.4-mini --sandbox read-only --full-auto "$prompt" >"$tmp_out" 2>"$tmp_err"; then
+    if codex exec -m "$CODEX_MODEL_RETRY" --sandbox read-only --full-auto "$prompt" >"$tmp_out" 2>"$tmp_err"; then
       true
     else
       true

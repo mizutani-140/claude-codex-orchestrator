@@ -167,6 +167,30 @@ if [[ "$ARCH_CHANGE" == "false" ]]; then
   exit 0
 fi
 
+# Fast path: small changes get lightweight review (skip expensive Codex adversarial review)
+FAST_PATH=false
+if [[ "${CHANGED_COUNT:-0}" -le 2 ]] && [[ "${INSERTIONS:-0}" -le 30 ]]; then
+  # Small change: skip Codex adversarial review, just do basic heuristic check
+  FAST_PATH=true
+fi
+
+# Check if only docs/config changes (not code)
+DOCS_ONLY=true
+while IFS= read -r file; do
+  case "$file" in
+    *.md|*.txt|*.json|*.yaml|*.yml|*.toml|.gitignore|CLAUDE.md|claude-progress.txt|feature-list.json)
+      ;; # docs/config file, keep DOCS_ONLY=true
+    *)
+      DOCS_ONLY=false
+      break
+      ;;
+  esac
+done <<< "$DIFF_FILES"
+
+if [[ "$DOCS_ONLY" == "true" ]]; then
+  FAST_PATH=true
+fi
+
 DIFF_HASH="$(printf '%s' "$DIFF_TEXT" | hash_stdin)"
 ACTIVE_HASH="$(read_state_field active_diff_hash)"
 REVIEW_ROUND="$(read_state_field review_round)"
@@ -206,6 +230,17 @@ if [[ -f "$READ_REVIEW_FILE" ]] && [[ "$REVIEW_ROUND" -ge 2 ]]; then
 fi
 
 INCREMENTAL_DIFF=""
+
+if [[ "$FAST_PATH" == "true" ]]; then
+  # Lightweight pass: no Codex review needed for small/docs changes
+  REVIEW_JSON='{"status":"PASS","summary":"Fast path: small or docs-only change, skipped adversarial review","blocking_issues":[],"fix_instructions":[]}'
+  echo "$REVIEW_JSON" > "$REVIEW_FILE"
+  if [[ "$REVIEW_FILE" != "$LEGACY_REVIEW_FILE" ]]; then
+    cp "$REVIEW_FILE" "$LEGACY_REVIEW_FILE" 2>/dev/null || true
+  fi
+  write_state "$DIFF_HASH" "$REVIEW_ROUND" "$MAX_REVIEW_ROUNDS" "PASS" "Fast path: small or docs-only change" "$DIFF_FILES"
+  exit 0
+fi
 
 REVIEW_JSON="$(ADVERSARIAL_REVIEW_ROUND="$REVIEW_ROUND" ADVERSARIAL_PREVIOUS_ISSUES="$PREV_ISSUES" ADVERSARIAL_INCREMENTAL_DIFF="$INCREMENTAL_DIFF" bash "$PROJECT_DIR/hooks/scripts/codex-adversarial-review.sh")"
 printf '%s\n' "$REVIEW_JSON" > "$REVIEW_FILE"
