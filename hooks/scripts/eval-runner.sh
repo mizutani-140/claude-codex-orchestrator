@@ -49,24 +49,33 @@ run_single_eval() {
   local exit_code=0
 
   if [[ -n "$TIMEOUT_CMD" ]]; then
-    output="$($TIMEOUT_CMD bash "$eval_file" 2>/dev/null)" || exit_code=$?
+    output="$($TIMEOUT_CMD bash "$eval_file" 2>/dev/null)" && exit_code=0 || exit_code=$?
   else
-    output="$(bash "$eval_file" 2>/dev/null)" || exit_code=$?
+    output="$(bash "$eval_file" 2>/dev/null)" && exit_code=0 || exit_code=$?
   fi
 
-  # If output is valid JSON, use it regardless of exit code
+  # If exit code is non-zero, always FAIL (even if JSON says PASS)
+  if [[ $exit_code -ne 0 ]]; then
+    local detail="eval exited with code $exit_code"
+    [[ $exit_code -eq 124 ]] && detail="eval timed out after 60s"
+    # Try to extract name from JSON output if available
+    if echo "$output" | jq -e '.name' >/dev/null 2>&1; then
+      eval_name="$(echo "$output" | jq -r '.name')"
+    fi
+    jq -n --arg name "$eval_name" --arg detail "$detail" \
+      '{name: $name, category: "unknown", status: "FAIL", detail: $detail}'
+    return 0
+  fi
+
+  # Exit 0: use JSON output if valid
   if echo "$output" | jq -e . >/dev/null 2>&1; then
     echo "$output"
     return 0
   fi
 
-  # No valid JSON: synthesize failure
-  local detail="eval failed (exit $exit_code)"
-  if [[ $exit_code -eq 124 ]]; then
-    detail="eval timed out after 60s"
-  fi
-  jq -n --arg name "$eval_name" --arg detail "$detail" \
-    '{name: $name, category: "unknown", status: "FAIL", detail: $detail}'
+  # Exit 0 but no valid JSON
+  jq -n --arg name "$eval_name" \
+    '{name: $name, category: "unknown", status: "FAIL", detail: "eval produced no valid JSON"}'
 }
 
 run_eval_dir() {

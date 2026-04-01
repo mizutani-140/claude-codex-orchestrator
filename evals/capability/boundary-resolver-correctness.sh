@@ -20,12 +20,14 @@ if [[ ! -x "$RESOLVER" ]]; then
   exit 0
 fi
 
-OUTPUT="$(printf '%s\n' "src/api/routes.ts" | bash "$RESOLVER" 2>&1 || true)"
+RESULT="$(echo "src/api/routes.ts" | bash "$RESOLVER" 2>/dev/null)"
+EXPECTED='["api-contract-test","integration-test"]'
+# Sort both arrays for order-independent comparison
+ACTUAL_SORTED="$(echo "$RESULT" | jq -S '[.[] | .] | sort' 2>/dev/null || echo "null")"
+EXPECTED_SORTED="$(echo "$EXPECTED" | jq -S '[.[] | .] | sort' 2>/dev/null)"
 
-if echo "$OUTPUT" | jq -e '. | length >= 2' >/dev/null 2>&1 \
-  && echo "$OUTPUT" | grep -q 'integration-test' \
-  && echo "$OUTPUT" | grep -q 'api-contract-test'; then
-  json_result "PASS" "resolver returned integration-test and api-contract-test for src/api/routes.ts"
+if [[ "$ACTUAL_SORTED" == "$EXPECTED_SORTED" ]]; then
+  json_result "PASS" "resolver returns exact expected set for api files"
 else
-  json_result "FAIL" "unexpected resolver output: $OUTPUT"
+  json_result "FAIL" "expected $EXPECTED_SORTED but got $ACTUAL_SORTED"
 fi
