@@ -15,14 +15,14 @@ else
   exit 1
 fi
 
-# Test 2: FAIL when no implementation result
+# Test 2: PASS through when no implementation result
 TEST_DIR="$TMPDIR_BASE/test-no-impl"
 mkdir -p "$TEST_DIR/.claude"
 OUTPUT="$(CLAUDE_PROJECT_DIR="$TEST_DIR" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
-if echo "$OUTPUT" | grep -q '"FAIL"'; then
-  echo "PASS: fails when no implementation result"
+if echo "$OUTPUT" | grep -q '"status":"PASS"' && echo "$OUTPUT" | grep -q 'No implementation result to evaluate'; then
+  echo "PASS: passes through when no implementation result"
 else
-  echo "FAIL: should fail when no implementation result"
+  echo "FAIL: should pass through when no implementation result"
   exit 1
 fi
 

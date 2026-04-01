@@ -54,7 +54,11 @@
       "Bash(bash tests/hooks/test-retry-separation.sh)",
       "Bash(bash tests/hooks/test-session-scoped-state.sh)",
       "Bash(bash tests/hooks/test-eval-gate-wiring.sh)",
-      "Bash(bash tests/hooks/test-session-end-evidence.sh)"
+      "Bash(bash tests/hooks/test-session-end-evidence.sh)",
+      "Bash(grep:*)",
+      "Bash(CODEX_MODEL_IMPLEMENT=gpt-5.4 CODEX_MODEL_RETRY=gpt-5.4-mini bash \"$CLAUDE_PROJECT_DIR/hooks/scripts/codex-implement.sh\")",
+      "Bash(bash tests/hooks/test-speed-optimizations.sh 2>&1)",
+      "Bash(bash hooks/scripts/session-start.sh)"
     ]
   },
   "hooks": {

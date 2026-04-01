@@ -4,8 +4,8 @@
     {
       "id": "harness-foundation",
       "title": "Cross-session memory and feature list infrastructure",
-      "status": "in-progress",
-      "passes": false,
+      "status": "done",
+      "passes": true,
       "acceptance": "claude-progress.txt, feature-list.json, init.sh, session-start.sh, session-end.sh exist and tests pass"
     },
     {

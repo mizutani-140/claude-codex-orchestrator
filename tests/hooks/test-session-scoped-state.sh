@@ -166,14 +166,14 @@ EOF
   git init -q
   git config user.name "Test User"
   git config user.email "test@example.com"
-  printf 'one\n' > file1.txt
-  printf 'two\n' > file2.txt
-  printf 'three\n' > file3.txt
-  git add file1.txt file2.txt file3.txt
+  printf 'one\n' > file1.js
+  printf 'two\n' > file2.js
+  printf 'three\n' > file3.js
+  git add file1.js file2.js file3.js
   git commit -m "init" -q
-  printf 'delta\n' >> file1.txt
-  printf 'delta\n' >> file2.txt
-  printf 'delta\n' >> file3.txt
+  printf 'delta\n' >> file1.js
+  printf 'delta\n' >> file2.js
+  printf 'delta\n' >> file3.js
   printf '{"stop_hook_active":false}\n' | CLAUDE_PROJECT_DIR="$ARCH_TEST_DIR" bash hooks/scripts/codex-architecture-gate.sh >/dev/null 2>&1 || true
 )
 
