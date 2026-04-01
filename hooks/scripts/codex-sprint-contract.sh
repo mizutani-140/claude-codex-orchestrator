@@ -6,24 +6,21 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/model-router.sh" 2>/dev/nu
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 SESSION_OUT_DIR="$(ensure_session_dir 2>/dev/null || echo "$PROJECT_DIR/.claude")"
 OUT_FILE="$SESSION_OUT_DIR/sprint-contract.json"
-LEGACY_OUT_FILE="$PROJECT_DIR/.claude/last-sprint-contract.json"
 mkdir -p "$PROJECT_DIR/.claude"
 
 if ! command -v codex >/dev/null 2>&1; then
-  echo '{"feature_id":"unknown","done_criteria":[],"test_plan":[],"boundary_tests_required":[],"error":"codex not found"}' | tee "$OUT_FILE"
-  if [[ "$OUT_FILE" != "$LEGACY_OUT_FILE" ]]; then
-    cp "$OUT_FILE" "$LEGACY_OUT_FILE" 2>/dev/null || true
-  fi
+  RESULT='{"feature_id":"unknown","done_criteria":[],"test_plan":[],"boundary_tests_required":[],"error":"codex not found"}'
+  write_session_and_legacy "sprint-contract.json" "$RESULT"
+  echo "$RESULT"
   exit 0
 fi
 
 TASK_TEXT="$(cat)"
 
 if [[ -z "${TASK_TEXT// }" ]]; then
-  echo '{"feature_id":"unknown","done_criteria":[],"test_plan":[],"boundary_tests_required":[],"error":"empty input"}' | tee "$OUT_FILE"
-  if [[ "$OUT_FILE" != "$LEGACY_OUT_FILE" ]]; then
-    cp "$OUT_FILE" "$LEGACY_OUT_FILE" 2>/dev/null || true
-  fi
+  RESULT='{"feature_id":"unknown","done_criteria":[],"test_plan":[],"boundary_tests_required":[],"error":"empty input"}'
+  write_session_and_legacy "sprint-contract.json" "$RESULT"
+  echo "$RESULT"
   exit 0
 fi
 
@@ -138,7 +135,5 @@ if ! is_valid_json "$RESULT"; then
   RESULT="$(error_result_json "$ERROR_MESSAGE")"
 fi
 
-echo "$RESULT" | tee "$OUT_FILE"
-if [[ "$OUT_FILE" != "$LEGACY_OUT_FILE" ]]; then
-  cp "$OUT_FILE" "$LEGACY_OUT_FILE" 2>/dev/null || true
-fi
+write_session_and_legacy "sprint-contract.json" "$RESULT"
+echo "$RESULT"

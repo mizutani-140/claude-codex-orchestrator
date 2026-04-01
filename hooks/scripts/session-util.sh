@@ -25,6 +25,7 @@ _legacy_session_name() {
     sprint-contract.json) printf '%s\n' "last-sprint-contract.json" ;;
     eval-gate.json) printf '%s\n' "last-eval-gate.json" ;;
     review-gate-state.json) printf '%s\n' "review-gate-state.json" ;;
+    plan-critique.json) printf '%s\n' "last-plan-critique.json" ;;
     *) printf '%s\n' "$1" ;;
   esac
 }
@@ -81,7 +82,7 @@ write_session_and_legacy() {
 }
 
 read_session_or_legacy() {
-  local session_name legacy_name session_path legacy_path
+  local session_name legacy_name session_path legacy_path session_id
   session_name="$1"
   legacy_name="${2:-$(_legacy_session_name "$session_name")}"
   session_path="$(session_file "$session_name")"
@@ -89,10 +90,13 @@ read_session_or_legacy() {
 
   if [[ -f "$session_path" ]]; then
     cat "$session_path"
-  elif [[ -f "$legacy_path" ]]; then
-    cat "$legacy_path"
   else
-    return 1
+    session_id="$(get_session_id)"
+    if [[ -z "$session_id" ]] && [[ -f "$legacy_path" ]]; then
+      cat "$legacy_path"
+    else
+      return 1
+    fi
   fi
 }
 

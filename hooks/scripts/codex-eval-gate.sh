@@ -3,30 +3,13 @@ set -euo pipefail
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/session-util.sh" 2>/dev/null || true
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-SESSION_DIR="$(ensure_session_dir 2>/dev/null || echo "$PROJECT_DIR/.claude")"
+mkdir -p "$PROJECT_DIR/.claude"
 
 # Input: implementation result (session-scoped with legacy fallback)
-SESSION_ID="$(get_session_id 2>/dev/null || echo "")"
-
-IMPL_FILE="$SESSION_DIR/implementation.json"
-if [[ ! -f "$IMPL_FILE" ]]; then
-  if [[ -z "$SESSION_ID" ]]; then
-    IMPL_FILE="$PROJECT_DIR/.claude/last-implementation-result.json"
-  fi
-fi
+IMPL_CONTENT="$(read_session_or_legacy "implementation.json" 2>/dev/null || echo "")"
 
 # Input: sprint contract (optional)
-CONTRACT_FILE="$SESSION_DIR/sprint-contract.json"
-if [[ ! -f "$CONTRACT_FILE" ]]; then
-  if [[ -z "$SESSION_ID" ]]; then
-    CONTRACT_FILE="$PROJECT_DIR/.claude/last-sprint-contract.json"
-  fi
-fi
-
-# Output
-OUT_FILE="$SESSION_DIR/eval-gate.json"
-LEGACY_OUT_FILE="$PROJECT_DIR/.claude/last-eval-gate.json"
-mkdir -p "$PROJECT_DIR/.claude"
+CONTRACT_CONTENT="$(read_session_or_legacy "sprint-contract.json" 2>/dev/null || echo "")"
 
 json_block() {
   local reason="$1"
@@ -51,20 +34,18 @@ fail_result() {
 
 write_result() {
   local content="$1"
-  echo "$content" | tee "$OUT_FILE"
-  if [[ "$OUT_FILE" != "$LEGACY_OUT_FILE" ]]; then
-    cp "$OUT_FILE" "$LEGACY_OUT_FILE" 2>/dev/null || true
-  fi
+  write_session_and_legacy "eval-gate.json" "$content"
+  echo "$content"
 }
 
 # Early exit: if no implementation result exists, pass through
 # (e.g., user manually stopping, or no codex-implement.sh was run)
-if [[ ! -f "$IMPL_FILE" ]]; then
+if [[ -z "$IMPL_CONTENT" ]]; then
   echo '{"status":"PASS","summary":"No implementation result to evaluate","checks":{},"failures":[]}'
   exit 0
 fi
 
-IMPL="$(cat "$IMPL_FILE")"
+IMPL="$IMPL_CONTENT"
 TESTS_STATUS="$(echo "$IMPL" | jq -r '.tests_status // "NOT_RUN"')"
 TEST_LOG="$(echo "$IMPL" | jq -r '.test_log // ""')"
 
@@ -88,7 +69,7 @@ fi
 # Currently reads contract but does not verify done_criteria.
 # Full contract validation would require Codex evaluation, which is too expensive for a gate.
 # TODO: Implement lightweight contract verification (e.g., check boundary_tests_required against tests_run)
-if [[ -f "$CONTRACT_FILE" ]]; then
+if [[ -n "$CONTRACT_CONTENT" ]]; then
   : # Contract exists but verification is deferred to future enhancement
 fi
 

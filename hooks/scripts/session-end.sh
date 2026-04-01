@@ -17,6 +17,7 @@ else
 fi
 
 cd "$PROJECT_DIR"
+export CLAUDE_PROJECT_DIR="$PROJECT_DIR"
 
 COMPLETED="${1:-}"
 NEXT="${2:-}"
@@ -86,9 +87,9 @@ if [[ -n "$FEATURE_ID" ]] && [[ -f feature-list.json ]] && command -v jq >/dev/n
         fi
       fi
     else
-      LEGACY_EVAL="$PROJECT_DIR/.claude/last-eval-gate.json"
-      if [[ -f "$LEGACY_EVAL" ]]; then
-        EVAL_STATUS="$(jq -r '.status // "UNKNOWN"' "$LEGACY_EVAL" 2>/dev/null || echo "UNKNOWN")"
+      LEGACY_EVAL_CONTENT="$(read_session_or_legacy "eval-gate.json" 2>/dev/null || echo "")"
+      if [[ -n "$LEGACY_EVAL_CONTENT" ]]; then
+        EVAL_STATUS="$(echo "$LEGACY_EVAL_CONTENT" | jq -r '.status // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")"
         if [[ "$EVAL_STATUS" == "PASS" ]]; then
           EVAL_PASS=true
         fi
@@ -96,9 +97,9 @@ if [[ -n "$FEATURE_ID" ]] && [[ -f feature-list.json ]] && command -v jq >/dev/n
         EVAL_PASS=true
       fi
 
-      LEGACY_ARCH="$PROJECT_DIR/.claude/last-adversarial-review.json"
-      if [[ -f "$LEGACY_ARCH" ]]; then
-        ARCH_STATUS="$(jq -r '.status // "UNKNOWN"' "$LEGACY_ARCH" 2>/dev/null || echo "UNKNOWN")"
+      LEGACY_ARCH_CONTENT="$(read_session_or_legacy "architecture-review.json" 2>/dev/null || echo "")"
+      if [[ -n "$LEGACY_ARCH_CONTENT" ]]; then
+        ARCH_STATUS="$(echo "$LEGACY_ARCH_CONTENT" | jq -r '.status // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")"
         if [[ "$ARCH_STATUS" == "PASS" ]]; then
           ARCH_PASS=true
         fi

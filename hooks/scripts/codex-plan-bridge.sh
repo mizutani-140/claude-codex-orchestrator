@@ -1,20 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/model-router.sh" 2>/dev/null || true
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/session-util.sh" 2>/dev/null || true
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-OUT_FILE="$PROJECT_DIR/.claude/last-plan-critique.json"
+SESSION_OUT_DIR="$(ensure_session_dir 2>/dev/null || echo "$PROJECT_DIR/.claude")"
+OUT_FILE="$SESSION_OUT_DIR/plan-critique.json"
 mkdir -p "$PROJECT_DIR/.claude"
 
 if ! command -v codex >/dev/null 2>&1; then
-  echo '{"verdict":"ERROR","summary":"codex command not found","issues":[],"suggested_changes":[]}' | tee "$OUT_FILE"
+  RESULT='{"verdict":"ERROR","summary":"codex command not found","issues":[],"suggested_changes":[]}'
+  write_session_and_legacy "plan-critique.json" "$RESULT"
+  echo "$RESULT"
   exit 0
 fi
 
 PLAN_TEXT="$(cat)"
 
 if [[ -z "${PLAN_TEXT// }" ]]; then
-  echo '{"verdict":"ERROR","summary":"plan text is empty","issues":[],"suggested_changes":[]}' | tee "$OUT_FILE"
+  RESULT='{"verdict":"ERROR","summary":"plan text is empty","issues":[],"suggested_changes":[]}'
+  write_session_and_legacy "plan-critique.json" "$RESULT"
+  echo "$RESULT"
   exit 0
 fi
 
@@ -136,4 +142,5 @@ if ! is_valid_json "$RESULT"; then
   RESULT="$(error_result_json "$SUMMARY")"
 fi
 
-echo "$RESULT" | tee "$OUT_FILE"
+write_session_and_legacy "plan-critique.json" "$RESULT"
+echo "$RESULT"

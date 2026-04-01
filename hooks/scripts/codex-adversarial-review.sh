@@ -6,14 +6,12 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/model-router.sh" 2>/dev/nu
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 SESSION_OUT_DIR="$(ensure_session_dir 2>/dev/null || echo "$PROJECT_DIR/.claude")"
 OUT_FILE="$SESSION_OUT_DIR/architecture-review.json"
-LEGACY_OUT_FILE="$PROJECT_DIR/.claude/last-adversarial-review.json"
 mkdir -p "$PROJECT_DIR/.claude"
 
 if ! command -v codex >/dev/null 2>&1; then
-  echo '{"status":"ERROR","summary":"codex command not found","blocking_issues":["Codex CLI missing"],"fix_instructions":["Install or configure Codex CLI"]}' | tee "$OUT_FILE"
-  if [[ "$OUT_FILE" != "$LEGACY_OUT_FILE" ]]; then
-    cp "$OUT_FILE" "$LEGACY_OUT_FILE" 2>/dev/null || true
-  fi
+  RESULT='{"status":"ERROR","summary":"codex command not found","blocking_issues":["Codex CLI missing"],"fix_instructions":["Install or configure Codex CLI"]}'
+  write_session_and_legacy "architecture-review.json" "$RESULT"
+  echo "$RESULT"
   exit 0
 fi
 
@@ -32,8 +30,9 @@ if [[ -z "$DIFF" ]]; then
       DIFF="$(git diff "$BASE_COMMIT"...HEAD 2>/dev/null || true)"
       DIFF_STAT="$(git diff --stat "$BASE_COMMIT"...HEAD 2>/dev/null || true)"
     else
-      echo '{"status":"ERROR","summary":"session base commit is invalid","blocking_issues":["Invalid baseline ref"],"fix_instructions":["Run session-start.sh"]}' | tee "$OUT_FILE"
-      [[ "$OUT_FILE" != "$LEGACY_OUT_FILE" ]] && cp "$OUT_FILE" "$LEGACY_OUT_FILE" 2>/dev/null || true
+      RESULT='{"status":"ERROR","summary":"session base commit is invalid","blocking_issues":["Invalid baseline ref"],"fix_instructions":["Run session-start.sh"]}'
+      write_session_and_legacy "architecture-review.json" "$RESULT"
+      echo "$RESULT"
       exit 0
     fi
   fi
@@ -42,8 +41,9 @@ fi
 DIFF_FOR_REVIEW="$DIFF"
 
 if [[ -z "$DIFF" ]]; then
-  echo '{"status":"PASS","summary":"No diff to review","blocking_issues":[],"fix_instructions":[]}' | tee "$OUT_FILE"
-  [[ "$OUT_FILE" != "$LEGACY_OUT_FILE" ]] && cp "$OUT_FILE" "$LEGACY_OUT_FILE" 2>/dev/null || true
+  RESULT='{"status":"PASS","summary":"No diff to review","blocking_issues":[],"fix_instructions":[]}'
+  write_session_and_legacy "architecture-review.json" "$RESULT"
+  echo "$RESULT"
   exit 0
 fi
 
@@ -184,7 +184,5 @@ if ! is_valid_json "$RESULT"; then
   RESULT="$(error_result_json "$SUMMARY")"
 fi
 
-echo "$RESULT" | tee "$OUT_FILE"
-if [[ "$OUT_FILE" != "$LEGACY_OUT_FILE" ]]; then
-  cp "$OUT_FILE" "$LEGACY_OUT_FILE" 2>/dev/null || true
-fi
+write_session_and_legacy "architecture-review.json" "$RESULT"
+echo "$RESULT"
