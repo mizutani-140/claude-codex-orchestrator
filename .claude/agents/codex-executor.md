@@ -75,7 +75,7 @@ maxTurns: 20
 
 #### Sprint Contract Reference
 
-- `.claude/last-sprint-contract.json` が存在する場合、`done_criteria` を実装の指針として Codex に渡す
+- `.claude/sessions/<id>/sprint-contract.json`（または legacy `.claude/last-sprint-contract.json`）が存在する場合、`done_criteria` を実装の指針として Codex に渡す
 - `boundary_tests_required` に記載のテスト種別を実行する
 
 #### Git Rule
@@ -93,7 +93,7 @@ maxTurns: 20
 
 ## gate block 対応
 
-`.claude/last-adversarial-review.json` が存在する場合:
+`.claude/sessions/<id>/architecture-review.json`（または legacy `.claude/last-adversarial-review.json`）が存在する場合:
 
 1. その JSON を読み込む
 2. `blocking_issues` と `fix_instructions` を抜き出す

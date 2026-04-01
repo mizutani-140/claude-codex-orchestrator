@@ -56,7 +56,7 @@ initialPrompt: Always delegate implementation, testing, and code review to codex
    b. `test_log` 内に最終テスト失敗がないことを確認
    c. `tests_status` と `test_log` の整合性を検証
    Note: eval gate は現時点では test_log 存在 + tests_status + 失敗キーワード検査を行う。sprint contract の done_criteria 照合は将来拡張。
-7. gate に block された場合は `.claude/last-eval-gate.json` または `.claude/last-adversarial-review.json` を読み、修正を `codex-executor` に再委任する
+7. gate に block された場合は session ディレクトリ（または legacy `.claude/last-eval-gate.json` / `.claude/last-adversarial-review.json`）を読み、修正を `codex-executor` に再委任する
 8. 全 gate PASS 後、変更ファイルを `git add` + `git commit` する
 9. PASS するまで継続する
 10. ループ上限時は未解決課題を整理してユーザーへ報告する
@@ -66,7 +66,7 @@ initialPrompt: Always delegate implementation, testing, and code review to codex
 `Stop` または `SubagentStop` で block された場合:
 
 1. block の `reason` を読む
-2. `.claude/last-adversarial-review.json` があれば読み込む
+2. session ディレクトリ（または legacy `.claude/last-adversarial-review.json`）があれば読み込む
 3. `blocking_issues` と `fix_instructions` を要約する
 4. その内容を Codex へ修正依頼として再委任する
 5. 修正後、再度完了を試みる
