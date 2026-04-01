@@ -38,7 +38,7 @@
     {
       "id": "p1-boundary-test-resolver",
       "title": "Connect boundary-test-map.json to deterministic resolver",
-      "status": "done",
+      "status": "needs-review",
       "passes": true,
       "acceptance": "Given a changed file list, resolver returns exact test commands. No ambiguity in which boundary tests to run. codex-implement.sh uses resolver output.",
       "depends_on": [

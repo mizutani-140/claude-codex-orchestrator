@@ -1,3 +1,12 @@
+## Session: 2026-04-01 12:16
+### Completed
+- P1-2 boundary-test-resolver complete. boundary-test-resolver.sh deterministically resolves changed files to boundary test types via regex. Integrated into codex-eval-gate.sh for post-impl verification. 16 new tests. Also fixed p1-session-artifact-migration status.
+### Next
+- P1-3 orch-health-split: Split check (fast CI) and doctor (diagnostic).
+### Blockers
+- None
+---
+
 ## Session: 2026-04-01 11:54
 ### Completed
 - P1-1 session-artifact-migration complete. All .claude/last-* direct writes eliminated. 7 scripts migrated to session-util.sh write_session_and_legacy/read_session_or_legacy. New test test-no-legacy-direct-writes.sh added. Agent docs updated. P1/P2 roadmap (12 features) added to feature-list.json. Reasoning effort set to high.
