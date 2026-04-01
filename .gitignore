@@ -5,7 +5,9 @@
 .claude/last-adversarial-review.json
 .claude/last-eval-gate.json
 .claude/last-sprint-contract.json
+.claude/last-boundary-attestation.json
 .claude/implementation.json
+.claude/boundary-attestation.json
 .claude/session-base-commit
 .claude/sessions/
 .claude/current-session
