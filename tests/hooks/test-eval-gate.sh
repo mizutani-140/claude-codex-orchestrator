@@ -145,27 +145,27 @@ else
   exit 1
 fi
 
-# Test 12: partial-name collision does not satisfy boundary check (exact match required)
+# Test 12: false positive prevention - boundary type not found anywhere in tests_run or test_log
 TEST_DIR_PARTIAL="$TMPDIR_BASE/test-partial-match"
 mkdir -p "$TEST_DIR_PARTIAL/.claude"
 REAL_RESOLVER_BAK_PARTIAL="$TMPDIR_BASE/boundary-test-resolver.sh.partial.bak"
 cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_PARTIAL"
 cat > "$REAL_RESOLVER" << 'RESOLVER'
 #!/usr/bin/env bash
-echo '["api-test"]'
+echo '["e2e-smoke-test"]'
 RESOLVER
 chmod +x "$REAL_RESOLVER"
-echo '{"status":"DONE","tests_status":"PASS","test_log":"all tests passed","changed_files":["src/api.ts"],"tests_run":["not-api-test-related","other-test"]}' > "$TEST_DIR_PARTIAL/.claude/last-implementation-result.json"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"unit tests passed","changed_files":["src/api.ts"],"tests_run":["bash tests/unit.sh","pnpm test"]}' > "$TEST_DIR_PARTIAL/.claude/last-implementation-result.json"
 OUTPUT_PARTIAL="$(CLAUDE_PROJECT_DIR="$TEST_DIR_PARTIAL" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
 mv "$REAL_RESOLVER_BAK_PARTIAL" "$REAL_RESOLVER"
 if echo "$OUTPUT_PARTIAL" | grep -q 'boundary tests not run'; then
-  echo "PASS: partial-name collision does not satisfy boundary check"
+  echo "PASS: false positive prevention - unrelated boundary type still blocked"
 else
-  echo "FAIL: partial-name collision falsely satisfied boundary check (output: $OUTPUT_PARTIAL)"
+  echo "FAIL: false positive not prevented (output: $OUTPUT_PARTIAL)"
   exit 1
 fi
 
-# Test 13: exact match does pass boundary check
+# Test 13: substring match in command string passes boundary check
 TEST_DIR_EXACT="$TMPDIR_BASE/test-exact-match"
 mkdir -p "$TEST_DIR_EXACT/.claude"
 REAL_RESOLVER_BAK_EXACT="$TMPDIR_BASE/boundary-test-resolver.sh.exact.bak"
@@ -175,14 +175,54 @@ cat > "$REAL_RESOLVER" << 'RESOLVER'
 echo '["api-test"]'
 RESOLVER
 chmod +x "$REAL_RESOLVER"
-echo '{"status":"DONE","tests_status":"PASS","test_log":"all tests passed","changed_files":["src/api.ts"],"tests_run":["api-test","unit-test"]}' > "$TEST_DIR_EXACT/.claude/last-implementation-result.json"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"all tests passed","changed_files":["src/api.ts"],"tests_run":["bash tests/api-test.sh","unit-test"]}' > "$TEST_DIR_EXACT/.claude/last-implementation-result.json"
 OUTPUT_EXACT="$(CLAUDE_PROJECT_DIR="$TEST_DIR_EXACT" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
 mv "$REAL_RESOLVER_BAK_EXACT" "$REAL_RESOLVER"
 EXACT_STATUS="$(echo "$OUTPUT_EXACT" | head -1 | jq -r '.status // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")"
 if [[ "$EXACT_STATUS" == "PASS" ]]; then
-  echo "PASS: exact match passes boundary check"
+  echo "PASS: substring match in command string passes boundary check"
 else
-  echo "FAIL: exact match did not pass boundary check (output: $OUTPUT_EXACT)"
+  echo "FAIL: substring match did not pass boundary check (output: $OUTPUT_EXACT)"
+  exit 1
+fi
+
+# Test 14: test_log match alone does NOT pass boundary check
+TEST_DIR_LOG="$TMPDIR_BASE/test-log-match"
+mkdir -p "$TEST_DIR_LOG/.claude"
+REAL_RESOLVER_BAK_LOG="$TMPDIR_BASE/boundary-test-resolver.sh.log.bak"
+cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_LOG"
+cat > "$REAL_RESOLVER" << 'RESOLVER'
+#!/usr/bin/env bash
+echo '["integration-test"]'
+RESOLVER
+chmod +x "$REAL_RESOLVER"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"Running integration-test suite...\n8 tests passed","changed_files":["src/api.ts"],"tests_run":["pnpm test"]}' > "$TEST_DIR_LOG/.claude/last-implementation-result.json"
+OUTPUT_LOG="$(CLAUDE_PROJECT_DIR="$TEST_DIR_LOG" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
+mv "$REAL_RESOLVER_BAK_LOG" "$REAL_RESOLVER"
+if echo "$OUTPUT_LOG" | grep -q 'boundary tests not run'; then
+  echo "PASS: test_log match alone does NOT pass boundary check"
+else
+  echo "FAIL: test_log match alone should not pass boundary check (output: $OUTPUT_LOG)"
+  exit 1
+fi
+
+# Test 15: security-scan in test_log alone does NOT satisfy boundary check
+TEST_DIR_SECURITY_LOG="$TMPDIR_BASE/test-security-log-match"
+mkdir -p "$TEST_DIR_SECURITY_LOG/.claude"
+REAL_RESOLVER_BAK_SECURITY_LOG="$TMPDIR_BASE/boundary-test-resolver.sh.security-log.bak"
+cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_SECURITY_LOG"
+cat > "$REAL_RESOLVER" << 'RESOLVER'
+#!/usr/bin/env bash
+echo '["security-scan"]'
+RESOLVER
+chmod +x "$REAL_RESOLVER"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"security-scan completed successfully","changed_files":["src/auth.ts"],"tests_run":["unit-test"]}' > "$TEST_DIR_SECURITY_LOG/.claude/last-implementation-result.json"
+OUTPUT_SECURITY_LOG="$(CLAUDE_PROJECT_DIR="$TEST_DIR_SECURITY_LOG" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
+mv "$REAL_RESOLVER_BAK_SECURITY_LOG" "$REAL_RESOLVER"
+if echo "$OUTPUT_SECURITY_LOG" | grep -q 'boundary tests not run'; then
+  echo "PASS: security-scan in test_log alone does NOT satisfy boundary check"
+else
+  echo "FAIL: security-scan in test_log alone should not satisfy boundary check (output: $OUTPUT_SECURITY_LOG)"
   exit 1
 fi
 

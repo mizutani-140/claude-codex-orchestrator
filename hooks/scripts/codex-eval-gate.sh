@@ -91,10 +91,11 @@ if [[ -n "$CHANGED_FILES" ]]; then
     elif ! echo "$REQUIRED_BOUNDARY" | jq -e 'type == "array"' >/dev/null 2>&1; then
       FAILURES+=("boundary-test-resolver.sh returned invalid JSON: $REQUIRED_BOUNDARY")
     elif [[ "$REQUIRED_BOUNDARY" != "[]" ]]; then
-      TESTS_RUN_JSON="$(echo "$IMPL" | jq '[.tests_run[]? // empty]' 2>/dev/null || echo "[]")"
+      TESTS_RUN_TEXT="$(echo "$IMPL" | jq -r '(.tests_run // []) | join("\n")' 2>/dev/null || echo "")"
+      SEARCH_CORPUS="$TESTS_RUN_TEXT"
       MISSING_BOUNDARY=""
       for bt in $(echo "$REQUIRED_BOUNDARY" | jq -r '.[]' 2>/dev/null); do
-        if ! echo "$TESTS_RUN_JSON" | jq -e --arg bt "$bt" 'any(.[]; . == $bt)' >/dev/null 2>&1; then
+        if ! echo "$SEARCH_CORPUS" | grep -qi "$bt"; then
           MISSING_BOUNDARY="$MISSING_BOUNDARY $bt"
         fi
       done

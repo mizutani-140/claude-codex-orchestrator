@@ -192,4 +192,21 @@ else
   exit 1
 fi
 
+# Test 11: status:done + passes:false is repaired to passes:true
+TEST11="$TMPDIR_BASE/test11"
+mkdir -p "$TEST11"
+setup_test_env "$TEST11"
+cd "$TEST11"
+echo '{"version":1,"features":[{"id":"feat1","title":"t","status":"done","passes":false,"acceptance":"x"}]}' > feature-list.json
+git add -A && git commit -m "legacy done" -q
+bash session-end.sh "More work" "Continue" "None" "feat1" "partial" "" 2>/dev/null || true
+STATUS="$(jq -r '.features[0].status' feature-list.json)"
+PASSES="$(jq -r '.features[0].passes' feature-list.json)"
+if [[ "$STATUS" == "done" && "$PASSES" == "true" ]]; then
+  echo "PASS: status:done + passes:false is repaired to passes:true"
+else
+  echo "FAIL: expected done/true after repair, got $STATUS/$PASSES"
+  exit 1
+fi
+
 echo "=== All session-end evidence tests passed ==="

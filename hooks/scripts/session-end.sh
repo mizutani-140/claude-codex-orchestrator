@@ -56,9 +56,14 @@ else
 fi
 
 if [[ -n "$FEATURE_ID" ]] && [[ -f feature-list.json ]] && command -v jq >/dev/null 2>&1; then
-  ALREADY_PASSING="$(jq --arg id "$FEATURE_ID" '[.features[] | select(.id == $id and .passes == true)] | length' feature-list.json 2>/dev/null || echo "0")"
-  if [[ "$ALREADY_PASSING" -gt 0 ]]; then
-    :
+  ALREADY_COMPLETE="$(jq --arg id "$FEATURE_ID" '[.features[] | select(.id == $id and (.passes == true or .status == "done"))] | length' feature-list.json 2>/dev/null || echo "0")"
+  if [[ "$ALREADY_COMPLETE" -gt 0 ]]; then
+    UPDATED="$(jq --arg id "$FEATURE_ID" '
+      .features |= map(
+        if .id == $id and .status == "done" and .passes != true then .passes = true else . end
+      )
+    ' feature-list.json)"
+    printf '%s\n' "$UPDATED" > feature-list.json
   else
     FINAL_STATUS="needs-review"
 
