@@ -49,37 +49,21 @@ step() {
 
 step "pwd" pwd
 
-# Sync settings.local.json hooks from template
+# Sync hooks from template to settings.local.json
 SETTINGS_LOCAL="$PROJECT_DIR/.claude/settings.local.json"
 SETTINGS_TEMPLATE="$PROJECT_DIR/.claude/settings.template.json"
+
 if [[ -f "$SETTINGS_TEMPLATE" ]]; then
   if [[ ! -f "$SETTINGS_LOCAL" ]]; then
+    # Fresh clone: copy template as-is
     cp "$SETTINGS_TEMPLATE" "$SETTINGS_LOCAL"
+  elif command -v jq >/dev/null 2>&1; then
+    # Existing file: surgically update hooks only, preserve everything else
+    TEMPLATE_HOOKS="$(jq '.hooks' "$SETTINGS_TEMPLATE")"
+    jq --argjson hooks "$TEMPLATE_HOOKS" '.hooks = $hooks' "$SETTINGS_LOCAL" > "${SETTINGS_LOCAL}.tmp" \
+      && mv "${SETTINGS_LOCAL}.tmp" "$SETTINGS_LOCAL"
   else
-    if command -v jq >/dev/null 2>&1; then
-      LOCAL_PERMS="$(
-        jq '
-          {
-            "allow": (
-              [
-                .. | objects | .allow? | arrays | .[]? | select(. != "Bash(bash:*)")
-              ] | unique
-            )
-          }
-        ' "$SETTINGS_LOCAL" 2>/dev/null || echo '{"allow":[]}'
-      )"
-      MERGED="$(jq --argjson perms "$LOCAL_PERMS" '. + {permissions: $perms}' "$SETTINGS_TEMPLATE" 2>/dev/null)"
-      if [[ -n "$MERGED" ]]; then
-        printf '%s\n' "$MERGED" > "$SETTINGS_LOCAL"
-        # Validate merge result contains required hooks
-        if ! grep -q 'codex-eval-gate' "$SETTINGS_LOCAL" 2>/dev/null; then
-          cp "$SETTINGS_TEMPLATE" "$SETTINGS_LOCAL"
-        fi
-      fi
-    else
-      # jq not available: overwrite local with template to ensure safe hooks
-      cp "$SETTINGS_TEMPLATE" "$SETTINGS_LOCAL"
-    fi
+    echo "WARNING: jq not available, skipping hooks sync for settings.local.json" >&2
   fi
 fi
 
