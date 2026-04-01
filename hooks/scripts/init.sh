@@ -49,28 +49,11 @@ step() {
 
 step "pwd" pwd
 
-# Sync hooks from template to settings.local.json
-SETTINGS_LOCAL="$PROJECT_DIR/.claude/settings.local.json"
-SETTINGS_TEMPLATE="$PROJECT_DIR/.claude/settings.template.json"
+# Source settings sync helper
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/settings-sync.sh"
 
-if [[ -f "$SETTINGS_TEMPLATE" ]]; then
-  if [[ ! -f "$SETTINGS_LOCAL" ]]; then
-    # Fresh clone: copy template as-is
-    cp "$SETTINGS_TEMPLATE" "$SETTINGS_LOCAL"
-  elif command -v jq >/dev/null 2>&1; then
-    # Existing file: surgically update hooks only, preserve everything else
-    TEMPLATE_HOOKS="$(jq '.hooks' "$SETTINGS_TEMPLATE")"
-    jq --argjson hooks "$TEMPLATE_HOOKS" '
-      .hooks = $hooks |
-      if .permissions.allow then
-        .permissions.allow |= [.[] | select(test("bash:\\*\\)$") | not)]
-      else . end
-    ' "$SETTINGS_LOCAL" > "${SETTINGS_LOCAL}.tmp" \
-      && mv "${SETTINGS_LOCAL}.tmp" "$SETTINGS_LOCAL"
-  else
-    echo "WARNING: jq not available, skipping hooks sync for settings.local.json" >&2
-  fi
-fi
+# Sync settings from template
+sync_settings_from_template "$PROJECT_DIR"
 
 if [[ -d node_modules ]] && [[ -f pnpm-lock.yaml ]]; then
   step "pnpm-install" true

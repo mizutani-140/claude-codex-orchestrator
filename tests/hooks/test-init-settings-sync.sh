@@ -3,6 +3,9 @@ set -euo pipefail
 
 REAL_PROJECT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 
+# Source the PRODUCTION settings-sync helper (no reimplementation)
+source "$REAL_PROJECT_DIR/hooks/scripts/settings-sync.sh"
+
 echo "=== test-init-settings-sync.sh ==="
 
 PASS_COUNT=0
@@ -10,31 +13,6 @@ FAIL_COUNT=0
 
 pass() { echo "PASS: $1"; PASS_COUNT=$((PASS_COUNT + 1)); }
 fail() { echo "FAIL: $1"; FAIL_COUNT=$((FAIL_COUNT + 1)); }
-
-# Helper: run just the settings sync logic extracted from init.sh
-# This avoids needing pnpm/node/codex in test environment
-run_settings_sync() {
-  local project_dir="$1"
-  local settings_local="$project_dir/.claude/settings.local.json"
-  local settings_template="$project_dir/.claude/settings.template.json"
-
-  if [[ -f "$settings_template" ]]; then
-    if [[ ! -f "$settings_local" ]]; then
-      cp "$settings_template" "$settings_local"
-    elif command -v jq >/dev/null 2>&1; then
-      TEMPLATE_HOOKS="$(jq '.hooks' "$settings_template")"
-      jq --argjson hooks "$TEMPLATE_HOOKS" '
-        .hooks = $hooks |
-        if .permissions.allow then
-          .permissions.allow |= [.[] | select(test("bash:\\*\\)$") | not)]
-        else . end
-      ' "$settings_local" > "${settings_local}.tmp" \
-        && mv "${settings_local}.tmp" "$settings_local"
-    else
-      echo "WARNING: jq not available, skipping hooks sync for settings.local.json" >&2
-    fi
-  fi
-}
 
 # Helper: create minimal repo structure
 setup_temp_repo() {
@@ -49,7 +27,7 @@ setup_temp_repo() {
 TMPDIR1="$(setup_temp_repo)"
 rm -f "$TMPDIR1/.claude/settings.local.json"
 
-run_settings_sync "$TMPDIR1"
+sync_settings_from_template "$TMPDIR1"
 
 if [[ -f "$TMPDIR1/.claude/settings.local.json" ]]; then
   if jq -e '.hooks' "$TMPDIR1/.claude/settings.local.json" >/dev/null 2>&1; then
@@ -75,7 +53,7 @@ cat > "$TMPDIR2/.claude/settings.local.json" <<'EXISTING'
 }
 EXISTING
 
-run_settings_sync "$TMPDIR2"
+sync_settings_from_template "$TMPDIR2"
 
 if jq -e '.permissions.allow' "$TMPDIR2/.claude/settings.local.json" | grep -q 'Bash(git:\*)'; then
   pass "existing permissions preserved after hooks sync"
@@ -109,7 +87,7 @@ cat > "$TMPDIR3/.claude/settings.local.json" <<'CUSTOM'
 }
 CUSTOM
 
-run_settings_sync "$TMPDIR3"
+sync_settings_from_template "$TMPDIR3"
 
 AGENT_VAL="$(jq -r '.agent' "$TMPDIR3/.claude/settings.local.json" 2>/dev/null)"
 CUSTOM_VAL="$(jq -r '.custom_key' "$TMPDIR3/.claude/settings.local.json" 2>/dev/null)"
@@ -134,19 +112,8 @@ PATH_WITHOUT_JQ="${PATH_WITHOUT_JQ%:}"
 
 (
   export PATH="$PATH_WITHOUT_JQ"
-  settings_local="$TMPDIR4/.claude/settings.local.json"
-  settings_template="$TMPDIR4/.claude/settings.template.json"
-  if [[ -f "$settings_template" ]]; then
-    if [[ ! -f "$settings_local" ]]; then
-      cp "$settings_template" "$settings_local"
-    elif command -v jq >/dev/null 2>&1; then
-      TEMPLATE_HOOKS="$(jq '.hooks' "$settings_template")"
-      jq --argjson hooks "$TEMPLATE_HOOKS" '.hooks = $hooks' "$settings_local" > "${settings_local}.tmp" \
-        && mv "${settings_local}.tmp" "$settings_local"
-    else
-      echo "WARNING: jq not available, skipping hooks sync for settings.local.json" >&2
-    fi
-  fi
+  source "$REAL_PROJECT_DIR/hooks/scripts/settings-sync.sh"
+  sync_settings_from_template "$TMPDIR4"
 ) 2>"$STDERR_OUT"
 
 AFTER_CONTENT="$(cat "$TMPDIR4/.claude/settings.local.json")"
@@ -164,23 +131,29 @@ fi
 rm -f "$STDERR_OUT"
 rm -rf "$TMPDIR4"
 
-# --- Test 5: init.sh source code contains correct sync logic ---
-if grep -q 'hooks = \$hooks' "$REAL_PROJECT_DIR/hooks/scripts/init.sh"; then
-  pass "init.sh contains surgical hooks-only update"
+# --- Test 5: source code wiring contains correct sync logic ---
+if grep -q 'source.*settings-sync.sh' "$REAL_PROJECT_DIR/hooks/scripts/init.sh"; then
+  pass "init.sh sources settings-sync.sh"
 else
-  fail "init.sh missing surgical hooks-only update"
+  fail "init.sh does not source settings-sync.sh"
 fi
 
-if grep -q 'WARNING.*jq not available' "$REAL_PROJECT_DIR/hooks/scripts/init.sh"; then
-  pass "init.sh has jq-missing warning"
+if grep -q 'hooks = \$hooks' "$REAL_PROJECT_DIR/hooks/scripts/settings-sync.sh"; then
+  pass "settings-sync.sh contains surgical hooks-only update"
 else
-  fail "init.sh missing jq-missing warning"
+  fail "settings-sync.sh missing surgical hooks-only update"
 fi
 
-if grep -Fq 'test("bash:\\*\\)$") | not' "$REAL_PROJECT_DIR/hooks/scripts/init.sh"; then
-  pass "init.sh uses the new broad Bash wildcard regex"
+if grep -q 'WARNING.*jq not available' "$REAL_PROJECT_DIR/hooks/scripts/settings-sync.sh"; then
+  pass "settings-sync.sh has jq-missing warning"
 else
-  fail "init.sh does not use the new broad Bash wildcard regex"
+  fail "settings-sync.sh missing jq-missing warning"
+fi
+
+if grep -Fq 'test("bash:\\*\\)$") | not' "$REAL_PROJECT_DIR/hooks/scripts/settings-sync.sh"; then
+  pass "settings-sync.sh uses the new broad Bash wildcard regex"
+else
+  fail "settings-sync.sh does not use the new broad Bash wildcard regex"
 fi
 
 # --- Test 6: Broad Bash wildcards are stripped during sync ---
@@ -199,7 +172,7 @@ cat > "$TMPDIR6/.claude/settings.local.json" <<'BROAD'
 }
 BROAD
 
-run_settings_sync "$TMPDIR6"
+sync_settings_from_template "$TMPDIR6"
 
 REMAINING="$(jq -r '.permissions.allow[]' "$TMPDIR6/.claude/settings.local.json" 2>/dev/null)"
 if echo "$REMAINING" | grep -q 'Bash(git:\*)' && echo "$REMAINING" | grep -q 'Bash(ls:\*)'; then
@@ -237,7 +210,7 @@ cat > "$TMPDIR7/.claude/settings.local.json" <<'LOWER'
 }
 LOWER
 
-run_settings_sync "$TMPDIR7"
+sync_settings_from_template "$TMPDIR7"
 
 REMAINING7="$(jq -r '.permissions.allow[]' "$TMPDIR7/.claude/settings.local.json" 2>/dev/null)"
 if echo "$REMAINING7" | grep -q 'Bash(git:\*)' && echo "$REMAINING7" | grep -q 'Bash(normal_permission)'; then
