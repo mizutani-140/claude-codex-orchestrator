@@ -99,7 +99,7 @@ else
 fi
 rm -rf "$TMPDIR3"
 
-# --- Test 4: No jq available - existing file not overwritten ---
+# --- Test 4: No jq available - existing file replaced with template (fail-closed) ---
 TMPDIR4="$(setup_temp_repo)"
 ORIGINAL_CONTENT='{"permissions":{"allow":["Bash(git:*)"]},"hooks":{"old":"value"}}'
 echo "$ORIGINAL_CONTENT" > "$TMPDIR4/.claude/settings.local.json"
@@ -116,17 +116,18 @@ PATH_WITHOUT_JQ="${PATH_WITHOUT_JQ%:}"
   sync_settings_from_template "$TMPDIR4"
 ) 2>"$STDERR_OUT"
 
+TEMPLATE_CONTENT="$(cat "$TMPDIR4/.claude/settings.template.json")"
 AFTER_CONTENT="$(cat "$TMPDIR4/.claude/settings.local.json")"
-if [[ "$AFTER_CONTENT" == "$ORIGINAL_CONTENT" ]]; then
-  pass "no-jq scenario: existing file not overwritten"
+if [[ "$AFTER_CONTENT" == "$TEMPLATE_CONTENT" ]]; then
+  pass "no-jq scenario: existing file replaced with template (fail-closed)"
 else
-  fail "no-jq scenario: existing file was modified"
+  fail "no-jq scenario: existing file was not replaced with template"
 fi
 
-if grep -q "WARNING.*jq not available" "$STDERR_OUT"; then
-  pass "no-jq scenario: warning printed to stderr"
+if grep -q "WARNING.*replacing settings.local.json with template" "$STDERR_OUT"; then
+  pass "no-jq scenario: replacement warning printed to stderr"
 else
-  fail "no-jq scenario: no warning printed"
+  fail "no-jq scenario: no replacement warning printed"
 fi
 rm -f "$STDERR_OUT"
 rm -rf "$TMPDIR4"

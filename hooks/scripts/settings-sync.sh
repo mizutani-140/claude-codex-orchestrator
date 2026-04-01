@@ -17,7 +17,8 @@ sync_settings_from_template() {
   fi
 
   if ! command -v jq >/dev/null 2>&1; then
-    echo "WARNING: jq not available, skipping hooks sync for settings.local.json" >&2
+    echo "WARNING: jq not available, replacing settings.local.json with template (permissions reset)" >&2
+    cp "$settings_template" "$settings_local"
     return 0
   fi
 
