@@ -209,4 +209,38 @@ else
   exit 1
 fi
 
+# Test 12: passes:true + status:needs-review is normalized to status:done + passes:true
+TEST12="$TMPDIR_BASE/test12"
+mkdir -p "$TEST12"
+setup_test_env "$TEST12"
+cd "$TEST12"
+echo '{"version":1,"features":[{"id":"feat1","title":"t","status":"needs-review","passes":true,"acceptance":"x"}]}' > feature-list.json
+git add -A && git commit -m "inconsistent state" -q
+bash session-end.sh "More work" "Continue" "None" "feat1" "partial" "" 2>/dev/null || true
+STATUS="$(jq -r '.features[0].status' feature-list.json)"
+PASSES="$(jq -r '.features[0].passes' feature-list.json)"
+if [[ "$STATUS" == "done" && "$PASSES" == "true" ]]; then
+  echo "PASS: passes:true + status:needs-review normalized to done/true"
+else
+  echo "FAIL: expected done/true after normalization, got $STATUS/$PASSES"
+  exit 1
+fi
+
+# Test 13: status:done + passes:false is normalized (same as test 11 but explicit)
+TEST13="$TMPDIR_BASE/test13"
+mkdir -p "$TEST13"
+setup_test_env "$TEST13"
+cd "$TEST13"
+echo '{"version":1,"features":[{"id":"feat1","title":"t","status":"done","passes":false,"acceptance":"x"}]}' > feature-list.json
+git add -A && git commit -m "done but not passes" -q
+bash session-end.sh "More work" "Continue" "None" "feat1" "partial" "" 2>/dev/null || true
+STATUS="$(jq -r '.features[0].status' feature-list.json)"
+PASSES="$(jq -r '.features[0].passes' feature-list.json)"
+if [[ "$STATUS" == "done" && "$PASSES" == "true" ]]; then
+  echo "PASS: status:done + passes:false normalized to done/true"
+else
+  echo "FAIL: expected done/true after normalization, got $STATUS/$PASSES"
+  exit 1
+fi
+
 echo "=== All session-end evidence tests passed ==="

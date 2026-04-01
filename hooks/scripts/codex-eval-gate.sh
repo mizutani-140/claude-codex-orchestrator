@@ -73,8 +73,14 @@ if [[ -n "$CONTRACT_CONTENT" ]]; then
   : # Contract exists but verification is deferred to future enhancement
 fi
 
-# Check 5: boundary test verification (fail-closed)
-CHANGED_FILES="$(echo "$IMPL" | jq -r '.changed_files[]? // empty' 2>/dev/null || echo "")"
+# Check 5: boundary test verification (fail-closed, structured)
+# Derive changed_files from git (machine evidence), fall back to model JSON
+GIT_CHANGED="$(git -C "$PROJECT_DIR" diff --name-only HEAD 2>/dev/null || echo "")"
+if [[ -n "$GIT_CHANGED" ]]; then
+  CHANGED_FILES="$GIT_CHANGED"
+else
+  CHANGED_FILES="$(echo "$IMPL" | jq -r '.changed_files[]? // empty' 2>/dev/null || echo "")"
+fi
 if [[ -n "$CHANGED_FILES" ]]; then
   SCRIPT_DIR_EVAL="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   RESOLVER="$SCRIPT_DIR_EVAL/boundary-test-resolver.sh"
@@ -91,34 +97,16 @@ if [[ -n "$CHANGED_FILES" ]]; then
     elif ! echo "$REQUIRED_BOUNDARY" | jq -e 'type == "array"' >/dev/null 2>&1; then
       FAILURES+=("boundary-test-resolver.sh returned invalid JSON: $REQUIRED_BOUNDARY")
     elif [[ "$REQUIRED_BOUNDARY" != "[]" ]]; then
-      # Extract boundary IDs from tests_run commands using pattern matching
-      # A command credits a boundary test if:
-      #   - It starts with a known test runner (bash, sh, pnpm, npm, npx, node, vitest, jest, pytest, make, go)
-      #   - AND contains the boundary test type as a substring
-      # "echo integration-test" does NOT qualify (echo is not a test runner)
-      TESTS_RUN_JSON="$(echo "$IMPL" | jq -r '(.tests_run // [])[]' 2>/dev/null || echo "")"
-      OBSERVED_BOUNDARY=""
-      KNOWN_TYPES="contract-test integration-test api-contract-test security-regression-test smoke-test"
-      while IFS= read -r cmd; do
-        [[ -z "$cmd" ]] && continue
-        # Check if command starts with a known test runner
-        RUNNER="$(echo "$cmd" | awk '{print $1}' | sed 's|.*/||')"
-        case "$RUNNER" in
-          bash|sh|pnpm|npm|npx|node|vitest|jest|pytest|make|go) ;;
-          *) continue ;;
-        esac
-        # Check which boundary types this command covers
-        for bt in $KNOWN_TYPES; do
-          if echo "$cmd" | grep -qi "$bt"; then
-            OBSERVED_BOUNDARY="$OBSERVED_BOUNDARY $bt"
-          fi
-        done
-      done <<< "$TESTS_RUN_JSON"
-
-      # Check required boundary types are all observed
+      # Read machine-attested boundary evidence (not model self-report)
+      ATTESTATION_CONTENT="$(read_session_or_legacy "boundary-attestation.json" "last-boundary-attestation.json" 2>/dev/null || echo "")"
+      if [[ -n "$ATTESTATION_CONTENT" ]]; then
+        BOUNDARY_RUN="$(echo "$ATTESTATION_CONTENT" | jq '(.boundary_tests_attested // [])' 2>/dev/null || echo "[]")"
+      else
+        BOUNDARY_RUN="[]"
+      fi
       MISSING_BOUNDARY=""
       for bt in $(echo "$REQUIRED_BOUNDARY" | jq -r '.[]' 2>/dev/null); do
-        if ! echo "$OBSERVED_BOUNDARY" | grep -qi "$bt"; then
+        if ! echo "$BOUNDARY_RUN" | jq -e --arg bt "$bt" 'any(.[]; . == $bt)' >/dev/null 2>&1; then
           MISSING_BOUNDARY="$MISSING_BOUNDARY $bt"
         fi
       done

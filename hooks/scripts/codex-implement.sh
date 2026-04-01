@@ -89,6 +89,8 @@ TDD WORKFLOW (mandatory for new features, recommended for bug fixes):
 BOUNDARY TESTS:
 If .claude/last-sprint-contract.json exists, read it and run any boundary_tests_required.
 Boundary test types: contract-test, integration-test, api-contract-test, security-regression-test, smoke-test.
+After running boundary tests, list the EXACT boundary test type IDs in the boundary_tests_run field.
+Only include types you actually executed and that passed.
 
 CRITICAL CONSTRAINTS:
 - You MUST run tests before reporting status as DONE.
@@ -108,6 +110,7 @@ Return JSON only. No markdown fences. Use exactly this schema:
   "tests_run": ["cmd1", "cmd2"],
   "tests_status": "PASS|FAIL|NOT_RUN",
   "test_log": "first 200 lines of actual test stdout+stderr including RED phase evidence",
+  "boundary_tests_run": ["integration-test", "contract-test"],
   "remaining_risks": ["..."]
 }
 
@@ -213,6 +216,29 @@ if ! is_valid_json "$RESULT"; then
     SUMMARY="$SUMMARY: $LAST_CODEX_STDERR"
   fi
   RESULT="$(error_result_json "$SUMMARY")"
+fi
+
+# Machine-attest boundary tests: only attest types that appear in both
+# boundary_tests_run AND test_log (defense against model fabrication)
+if is_valid_json "$RESULT"; then
+  BTR_CLAIMED="$(echo "$RESULT" | jq -r '(.boundary_tests_run // [])[]' 2>/dev/null || echo "")"
+  BTR_LOG="$(echo "$RESULT" | jq -r '.test_log // ""' 2>/dev/null || echo "")"
+  BTR_ATTESTED="[]"
+  if [[ -n "$BTR_CLAIMED" ]]; then
+    BTR_LIST=""
+    while IFS= read -r bt_type; do
+      [[ -z "$bt_type" ]] && continue
+      if echo "$BTR_LOG" | grep -qi "$bt_type"; then
+        BTR_LIST="$BTR_LIST\"$bt_type\","
+      fi
+    done <<< "$BTR_CLAIMED"
+    if [[ -n "$BTR_LIST" ]]; then
+      BTR_ATTESTED="[${BTR_LIST%,}]"
+    fi
+  fi
+  ATTESTATION="$(jq -cn --argjson attested "$BTR_ATTESTED" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '{boundary_tests_attested:$attested,attested_at:$ts,attester:"codex-implement.sh"}')"
+  write_session_and_legacy "boundary-attestation.json" "$ATTESTATION"
+  _atomic_write_file "$PROJECT_DIR/.claude/last-boundary-attestation.json" "$ATTESTATION"
 fi
 
 write_session_and_legacy "implementation.json" "$RESULT"

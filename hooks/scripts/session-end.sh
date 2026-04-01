@@ -60,7 +60,9 @@ if [[ -n "$FEATURE_ID" ]] && [[ -f feature-list.json ]] && command -v jq >/dev/n
   if [[ "$ALREADY_COMPLETE" -gt 0 ]]; then
     UPDATED="$(jq --arg id "$FEATURE_ID" '
       .features |= map(
-        if .id == $id and .status == "done" and .passes != true then .passes = true else . end
+        if .id == $id and (.passes == true or .status == "done") then
+          .status = "done" | .passes = true
+        else . end
       )
     ' feature-list.json)"
     printf '%s\n' "$UPDATED" > feature-list.json

@@ -91,6 +91,18 @@ fi
 # Test 9: boundary tests required but not run -> FAIL
 TEST_DIR_BT="$TMPDIR_BASE/test-boundary-block"
 mkdir -p "$TEST_DIR_BT/.claude" "$TEST_DIR_BT/hooks/scripts"
+cd "$TEST_DIR_BT"
+git init -q
+git config user.name "Test"
+git config user.email "test@test.com"
+touch initial.txt
+git add initial.txt
+git commit -m "init" -q
+mkdir -p src/api
+echo "baseline" > src/api/routes.ts
+git add src/api/routes.ts
+git commit -m "add routes" -q
+echo "change" > src/api/routes.ts
 cat > "$TEST_DIR_BT/hooks/scripts/boundary-test-resolver.sh" << 'RESOLVER'
 #!/usr/bin/env bash
 echo '["integration-test","api-contract-test"]'
@@ -145,104 +157,234 @@ else
   exit 1
 fi
 
-# Test 12: false positive prevention - boundary type not found anywhere in tests_run or test_log
-TEST_DIR_PARTIAL="$TMPDIR_BASE/test-partial-match"
-mkdir -p "$TEST_DIR_PARTIAL/.claude"
-REAL_RESOLVER_BAK_PARTIAL="$TMPDIR_BASE/boundary-test-resolver.sh.partial.bak"
-cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_PARTIAL"
-cat > "$REAL_RESOLVER" << 'RESOLVER'
-#!/usr/bin/env bash
-echo '["e2e-smoke-test"]'
-RESOLVER
-chmod +x "$REAL_RESOLVER"
-echo '{"status":"DONE","tests_status":"PASS","test_log":"unit tests passed","changed_files":["src/api.ts"],"tests_run":["bash tests/unit.sh","pnpm test"]}' > "$TEST_DIR_PARTIAL/.claude/last-implementation-result.json"
-OUTPUT_PARTIAL="$(CLAUDE_PROJECT_DIR="$TEST_DIR_PARTIAL" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
-mv "$REAL_RESOLVER_BAK_PARTIAL" "$REAL_RESOLVER"
-if echo "$OUTPUT_PARTIAL" | grep -q 'boundary tests not run'; then
-  echo "PASS: false positive prevention - unrelated boundary type still blocked"
-else
-  echo "FAIL: false positive not prevented (output: $OUTPUT_PARTIAL)"
-  exit 1
-fi
-
-# Test 13: echo command with boundary type name does NOT satisfy gate (not a test runner)
-TEST_DIR_EXACT="$TMPDIR_BASE/test-echo-bypass"
-mkdir -p "$TEST_DIR_EXACT/.claude"
-REAL_RESOLVER_BAK_EXACT="$TMPDIR_BASE/boundary-test-resolver.sh.exact.bak"
-cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_EXACT"
+# Test 12: boundary_tests_run with matching types -> PASS
+TEST_DIR_BTR="$TMPDIR_BASE/test-btr-pass"
+mkdir -p "$TEST_DIR_BTR/.claude"
+cd "$TEST_DIR_BTR"
+git init -q
+git config user.name "Test"
+git config user.email "test@test.com"
+touch initial.txt
+git add initial.txt
+git commit -m "init" -q
+mkdir -p src/api
+echo "baseline" > src/api/routes.ts
+git add src/api/routes.ts
+git commit -m "add routes" -q
+echo "change" > src/api/routes.ts
+REAL_RESOLVER_BAK_BTR="$TMPDIR_BASE/boundary-test-resolver.sh.btr.bak"
+cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_BTR"
 cat > "$REAL_RESOLVER" << 'RESOLVER'
 #!/usr/bin/env bash
 echo '["integration-test","api-contract-test"]'
 RESOLVER
 chmod +x "$REAL_RESOLVER"
-echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["echo integration-test","echo api-contract-test"]}' > "$TEST_DIR_EXACT/.claude/last-implementation-result.json"
-OUTPUT_EXACT="$(CLAUDE_PROJECT_DIR="$TEST_DIR_EXACT" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
-mv "$REAL_RESOLVER_BAK_EXACT" "$REAL_RESOLVER"
-if echo "$OUTPUT_EXACT" | grep -q '"FAIL"'; then
-  echo "PASS: echo command does not satisfy boundary gate"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["some-cmd"],"boundary_tests_run":["integration-test","api-contract-test"]}' > "$TEST_DIR_BTR/.claude/last-implementation-result.json"
+echo '{"boundary_tests_attested":["integration-test","api-contract-test"],"attested_at":"2026-01-01T00:00:00Z","attester":"codex-implement.sh"}' > "$TEST_DIR_BTR/.claude/last-boundary-attestation.json"
+OUTPUT_BTR="$(CLAUDE_PROJECT_DIR="$TEST_DIR_BTR" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
+mv "$REAL_RESOLVER_BAK_BTR" "$REAL_RESOLVER"
+BTR_STATUS="$(echo "$OUTPUT_BTR" | head -1 | jq -r '.status // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")"
+if [[ "$BTR_STATUS" == "PASS" ]]; then
+  echo "PASS: machine attestation with matching types passes gate"
 else
-  echo "FAIL: echo command should not satisfy boundary gate"
+  echo "FAIL: machine attestation with matching types should pass (output: $OUTPUT_BTR)"
   exit 1
 fi
 
-# Test 14: test_log match alone does NOT pass boundary check
-TEST_DIR_LOG="$TMPDIR_BASE/test-log-match"
-mkdir -p "$TEST_DIR_LOG/.claude"
-REAL_RESOLVER_BAK_LOG="$TMPDIR_BASE/boundary-test-resolver.sh.log.bak"
-cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_LOG"
+# Test 13: boundary_tests_run empty when required -> FAIL
+TEST_DIR_BTE="$TMPDIR_BASE/test-btr-empty"
+mkdir -p "$TEST_DIR_BTE/.claude"
+cd "$TEST_DIR_BTE"
+git init -q
+git config user.name "Test"
+git config user.email "test@test.com"
+touch initial.txt
+git add initial.txt
+git commit -m "init" -q
+mkdir -p src
+echo "baseline" > src/api.ts
+git add src/api.ts
+git commit -m "add api" -q
+echo "change" > src/api.ts
+REAL_RESOLVER_BAK_BTE="$TMPDIR_BASE/boundary-test-resolver.sh.bte.bak"
+cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_BTE"
 cat > "$REAL_RESOLVER" << 'RESOLVER'
 #!/usr/bin/env bash
 echo '["integration-test"]'
 RESOLVER
 chmod +x "$REAL_RESOLVER"
-echo '{"status":"DONE","tests_status":"PASS","test_log":"Running integration-test suite...\n8 tests passed","changed_files":["src/api.ts"],"tests_run":["pnpm test"]}' > "$TEST_DIR_LOG/.claude/last-implementation-result.json"
-OUTPUT_LOG="$(CLAUDE_PROJECT_DIR="$TEST_DIR_LOG" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
-mv "$REAL_RESOLVER_BAK_LOG" "$REAL_RESOLVER"
-if echo "$OUTPUT_LOG" | grep -q 'boundary tests not run'; then
-  echo "PASS: test_log match alone does NOT pass boundary check"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api.ts"],"tests_run":["pnpm test"],"boundary_tests_run":[]}' > "$TEST_DIR_BTE/.claude/last-implementation-result.json"
+OUTPUT_BTE="$(CLAUDE_PROJECT_DIR="$TEST_DIR_BTE" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
+mv "$REAL_RESOLVER_BAK_BTE" "$REAL_RESOLVER"
+if echo "$OUTPUT_BTE" | grep -q 'boundary tests not run'; then
+  echo "PASS: empty boundary_tests_run with required types triggers FAIL"
 else
-  echo "FAIL: test_log match alone should not pass boundary check (output: $OUTPUT_LOG)"
+  echo "FAIL: empty boundary_tests_run should trigger FAIL (output: $OUTPUT_BTE)"
   exit 1
 fi
 
-# Test 15: security-scan in test_log alone does NOT satisfy boundary check
-TEST_DIR_SECURITY_LOG="$TMPDIR_BASE/test-security-log-match"
-mkdir -p "$TEST_DIR_SECURITY_LOG/.claude"
-REAL_RESOLVER_BAK_SECURITY_LOG="$TMPDIR_BASE/boundary-test-resolver.sh.security-log.bak"
-cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_SECURITY_LOG"
+# Test 14: boundary_tests_run partial coverage -> FAIL for missing types
+TEST_DIR_BTP="$TMPDIR_BASE/test-btr-partial"
+mkdir -p "$TEST_DIR_BTP/.claude"
+cd "$TEST_DIR_BTP"
+git init -q
+git config user.name "Test"
+git config user.email "test@test.com"
+touch initial.txt
+git add initial.txt
+git commit -m "init" -q
+mkdir -p src
+echo "baseline" > src/api.ts
+git add src/api.ts
+git commit -m "add api" -q
+echo "change" > src/api.ts
+REAL_RESOLVER_BAK_BTP="$TMPDIR_BASE/boundary-test-resolver.sh.btp.bak"
+cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_BTP"
 cat > "$REAL_RESOLVER" << 'RESOLVER'
 #!/usr/bin/env bash
-echo '["security-scan"]'
+echo '["integration-test","api-contract-test","smoke-test"]'
 RESOLVER
 chmod +x "$REAL_RESOLVER"
-echo '{"status":"DONE","tests_status":"PASS","test_log":"security-scan completed successfully","changed_files":["src/auth.ts"],"tests_run":["unit-test"]}' > "$TEST_DIR_SECURITY_LOG/.claude/last-implementation-result.json"
-OUTPUT_SECURITY_LOG="$(CLAUDE_PROJECT_DIR="$TEST_DIR_SECURITY_LOG" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
-mv "$REAL_RESOLVER_BAK_SECURITY_LOG" "$REAL_RESOLVER"
-if echo "$OUTPUT_SECURITY_LOG" | grep -q 'boundary tests not run'; then
-  echo "PASS: security-scan in test_log alone does NOT satisfy boundary check"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api.ts"],"tests_run":["pnpm test"],"boundary_tests_run":["integration-test"]}' > "$TEST_DIR_BTP/.claude/last-implementation-result.json"
+echo '{"boundary_tests_attested":["integration-test"],"attested_at":"2026-01-01T00:00:00Z","attester":"codex-implement.sh"}' > "$TEST_DIR_BTP/.claude/last-boundary-attestation.json"
+OUTPUT_BTP="$(CLAUDE_PROJECT_DIR="$TEST_DIR_BTP" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
+mv "$REAL_RESOLVER_BAK_BTP" "$REAL_RESOLVER"
+if echo "$OUTPUT_BTP" | grep -q 'api-contract-test' && echo "$OUTPUT_BTP" | grep -q 'smoke-test'; then
+  echo "PASS: partial boundary attestation reports missing types"
 else
-  echo "FAIL: security-scan in test_log alone should not satisfy boundary check (output: $OUTPUT_SECURITY_LOG)"
+  echo "FAIL: partial boundary attestation should report missing types (output: $OUTPUT_BTP)"
   exit 1
 fi
 
-# Test 16: real test runner command satisfies boundary gate
-TEST_DIR_REAL="$TMPDIR_BASE/test-real-runner"
-mkdir -p "$TEST_DIR_REAL/.claude"
-REAL_RESOLVER_BAK_REAL="$TMPDIR_BASE/boundary-test-resolver.sh.real.bak"
-cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_REAL"
+# Test 15: boundary_tests_run field missing (not present in JSON) -> FAIL when required
+TEST_DIR_BTM="$TMPDIR_BASE/test-btr-missing-field"
+mkdir -p "$TEST_DIR_BTM/.claude"
+cd "$TEST_DIR_BTM"
+git init -q
+git config user.name "Test"
+git config user.email "test@test.com"
+touch initial.txt
+git add initial.txt
+git commit -m "init" -q
+mkdir -p src
+echo "baseline" > src/auth.ts
+git add src/auth.ts
+git commit -m "add auth" -q
+echo "change" > src/auth.ts
+REAL_RESOLVER_BAK_BTM="$TMPDIR_BASE/boundary-test-resolver.sh.btm.bak"
+cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_BTM"
+cat > "$REAL_RESOLVER" << 'RESOLVER'
+#!/usr/bin/env bash
+echo '["security-regression-test"]'
+RESOLVER
+chmod +x "$REAL_RESOLVER"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"security scan done","changed_files":["src/auth.ts"],"tests_run":["unit-test"]}' > "$TEST_DIR_BTM/.claude/last-implementation-result.json"
+OUTPUT_BTM="$(CLAUDE_PROJECT_DIR="$TEST_DIR_BTM" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
+mv "$REAL_RESOLVER_BAK_BTM" "$REAL_RESOLVER"
+if echo "$OUTPUT_BTM" | grep -q 'boundary tests not run'; then
+  echo "PASS: missing boundary_tests_run field triggers FAIL when required"
+else
+  echo "FAIL: missing field should trigger FAIL (output: $OUTPUT_BTM)"
+  exit 1
+fi
+
+# Test 16: boundary_tests_run with exact match passes even without matching tests_run commands
+TEST_DIR_BTX="$TMPDIR_BASE/test-btr-exact"
+mkdir -p "$TEST_DIR_BTX/.claude"
+cd "$TEST_DIR_BTX"
+git init -q
+git config user.name "Test"
+git config user.email "test@test.com"
+touch initial.txt
+git add initial.txt
+git commit -m "init" -q
+mkdir -p src/api
+echo "baseline" > src/api/routes.ts
+git add src/api/routes.ts
+git commit -m "add routes" -q
+echo "change" > src/api/routes.ts
+REAL_RESOLVER_BAK_BTX="$TMPDIR_BASE/boundary-test-resolver.sh.btx.bak"
+cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_BTX"
 cat > "$REAL_RESOLVER" << 'RESOLVER'
 #!/usr/bin/env bash
 echo '["integration-test","api-contract-test"]'
 RESOLVER
 chmod +x "$REAL_RESOLVER"
-echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["bash tests/integration-test.sh","pnpm test:api-contract-test"]}' > "$TEST_DIR_REAL/.claude/last-implementation-result.json"
-OUTPUT_REAL="$(CLAUDE_PROJECT_DIR="$TEST_DIR_REAL" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
-mv "$REAL_RESOLVER_BAK_REAL" "$REAL_RESOLVER"
-REAL_STATUS="$(echo "$OUTPUT_REAL" | head -1 | jq -r '.status // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")"
-if [[ "$REAL_STATUS" == "PASS" ]]; then
-  echo "PASS: real test runner satisfies boundary gate"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["make test"],"boundary_tests_run":["integration-test","api-contract-test"]}' > "$TEST_DIR_BTX/.claude/last-implementation-result.json"
+echo '{"boundary_tests_attested":["integration-test","api-contract-test"],"attested_at":"2026-01-01T00:00:00Z","attester":"codex-implement.sh"}' > "$TEST_DIR_BTX/.claude/last-boundary-attestation.json"
+OUTPUT_BTX="$(CLAUDE_PROJECT_DIR="$TEST_DIR_BTX" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
+mv "$REAL_RESOLVER_BAK_BTX" "$REAL_RESOLVER"
+BTX_STATUS="$(echo "$OUTPUT_BTX" | head -1 | jq -r '.status // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")"
+if [[ "$BTX_STATUS" == "PASS" ]]; then
+  echo "PASS: machine attestation exact match passes regardless of tests_run content"
 else
-  echo "FAIL: real test runner should satisfy boundary gate (output: $OUTPUT_REAL)"
+  echo "FAIL: should pass with machine attestation exact match (output: $OUTPUT_BTX)"
+  exit 1
+fi
+
+# Test 17: changed_files:[] does not bypass boundary check when git shows changes
+TEST_DIR_BYPASS="$TMPDIR_BASE/test-bypass-empty-cf"
+mkdir -p "$TEST_DIR_BYPASS/.claude"
+cd "$TEST_DIR_BYPASS"
+git init -q
+git config user.name "Test"
+git config user.email "test@test.com"
+touch initial.txt
+git add initial.txt
+git commit -m "init" -q
+mkdir -p src/api
+echo "baseline" > src/api/routes.ts
+git add src/api/routes.ts
+git commit -m "add routes" -q
+echo "change" > src/api/routes.ts
+REAL_RESOLVER_BAK_BYPASS="$TMPDIR_BASE/boundary-test-resolver.sh.bypass.bak"
+cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_BYPASS"
+cat > "$REAL_RESOLVER" << 'RESOLVER'
+#!/usr/bin/env bash
+echo '["integration-test"]'
+RESOLVER
+chmod +x "$REAL_RESOLVER"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":[],"tests_run":["pnpm test"],"boundary_tests_run":["integration-test"]}' > "$TEST_DIR_BYPASS/.claude/last-implementation-result.json"
+OUTPUT_BYPASS="$(CLAUDE_PROJECT_DIR="$TEST_DIR_BYPASS" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
+mv "$REAL_RESOLVER_BAK_BYPASS" "$REAL_RESOLVER"
+if echo "$OUTPUT_BYPASS" | grep -q 'boundary tests not run'; then
+  echo "PASS: changed_files:[] bypass blocked by git diff"
+else
+  echo "FAIL: changed_files:[] should not bypass when git shows changes (output: $OUTPUT_BYPASS)"
+  exit 1
+fi
+
+# Test 18: machine attestation file used instead of model self-report
+TEST_DIR_ATTEST="$TMPDIR_BASE/test-attestation"
+mkdir -p "$TEST_DIR_ATTEST/.claude"
+cd "$TEST_DIR_ATTEST"
+git init -q
+git config user.name "Test"
+git config user.email "test@test.com"
+touch initial.txt
+git add initial.txt
+git commit -m "init" -q
+mkdir -p src/api
+echo "baseline" > src/api/routes.ts
+git add src/api/routes.ts
+git commit -m "add routes" -q
+echo "change" > src/api/routes.ts
+REAL_RESOLVER_BAK_ATTEST="$TMPDIR_BASE/boundary-test-resolver.sh.attest.bak"
+cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_ATTEST"
+cat > "$REAL_RESOLVER" << 'RESOLVER'
+#!/usr/bin/env bash
+echo '["integration-test"]'
+RESOLVER
+chmod +x "$REAL_RESOLVER"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["pnpm test"],"boundary_tests_run":["integration-test"]}' > "$TEST_DIR_ATTEST/.claude/last-implementation-result.json"
+echo '{"boundary_tests_attested":["integration-test"],"attested_at":"2026-01-01T00:00:00Z","attester":"codex-implement.sh"}' > "$TEST_DIR_ATTEST/.claude/last-boundary-attestation.json"
+OUTPUT_ATTEST="$(CLAUDE_PROJECT_DIR="$TEST_DIR_ATTEST" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
+mv "$REAL_RESOLVER_BAK_ATTEST" "$REAL_RESOLVER"
+ATTEST_STATUS="$(echo "$OUTPUT_ATTEST" | head -1 | jq -r '.status // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")"
+if [[ "$ATTEST_STATUS" == "PASS" ]]; then
+  echo "PASS: machine attestation file satisfies boundary gate"
+else
+  echo "FAIL: machine attestation should satisfy gate (output: $OUTPUT_ATTEST)"
   exit 1
 fi
 
