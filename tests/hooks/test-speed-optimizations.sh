@@ -23,7 +23,7 @@ else
 fi
 
 # Test 2b: model-router.sh uses supported default models
-if [[ "$CODEX_MODEL_IMPLEMENT" == "gpt-5.4" && "$CODEX_MODEL_REVIEW" == "gpt-5.4-mini" && "$CODEX_MODEL_RETRY" == "gpt-5.4-mini" ]]; then
+if [[ "$CODEX_MODEL_IMPLEMENT" == "gpt-5.4" && "$CODEX_MODEL_REVIEW" == "gpt-5.4" && "$CODEX_MODEL_RETRY" == "gpt-5.4" ]]; then
   echo "PASS: model-router.sh uses supported default models"
 else
   echo "FAIL: unsupported defaults implement=$CODEX_MODEL_IMPLEMENT review=$CODEX_MODEL_REVIEW retry=$CODEX_MODEL_RETRY"
@@ -67,6 +67,31 @@ if [[ "$OVERRIDE_VALUE" == "test-model" ]]; then
 else
   echo "FAIL: model vars not overridable"
   exit 1
+fi
+
+# Test 7: no stale model pins in settings.local.json allowlist
+if [[ -f "$PROJECT_DIR/.claude/settings.local.json" ]]; then
+  STALE_PINS=$(grep -c 'gpt-5\.4-mini' "$PROJECT_DIR/.claude/settings.local.json" || true)
+  if [[ "$STALE_PINS" -eq 0 ]]; then
+    echo "PASS: no stale gpt-5.4-mini pins in settings.local.json"
+  else
+    echo "FAIL: found $STALE_PINS stale gpt-5.4-mini references in settings.local.json"
+    exit 1
+  fi
+else
+  echo "PASS: no settings.local.json to check (skip)"
+fi
+
+# Test 8: no wildcard bash permission in settings.local.json
+if [[ -f "$PROJECT_DIR/.claude/settings.local.json" ]]; then
+  if grep -q '"Bash(bash:\*)"' "$PROJECT_DIR/.claude/settings.local.json"; then
+    echo "FAIL: Bash(bash:*) wildcard found in settings.local.json"
+    exit 1
+  else
+    echo "PASS: no Bash(bash:*) wildcard in settings.local.json"
+  fi
+else
+  echo "PASS: no settings.local.json to check (skip)"
 fi
 
 echo "=== All speed optimization tests passed ==="
