@@ -105,14 +105,8 @@ ORIGINAL_CONTENT='{"permissions":{"allow":["Bash(git:*)"]},"hooks":{"old":"value
 echo "$ORIGINAL_CONTENT" > "$TMPDIR4/.claude/settings.local.json"
 
 STDERR_OUT="$(mktemp)"
-PATH_WITHOUT_JQ="$(echo "$PATH" | tr ':' '\n' | while read -r p; do
-  if [[ ! -x "$p/jq" ]]; then echo "$p"; fi
-done | tr '\n' ':')"
-PATH_WITHOUT_JQ="${PATH_WITHOUT_JQ%:}"
-
 (
-  export PATH="$PATH_WITHOUT_JQ"
-  source "$REAL_PROJECT_DIR/hooks/scripts/settings-sync.sh"
+  export JQ_CMD="/nonexistent/jq"
   sync_settings_from_template "$TMPDIR4"
 ) 2>"$STDERR_OUT"
 
@@ -124,7 +118,7 @@ else
   fail "no-jq scenario: existing file was not replaced with template"
 fi
 
-if grep -q "WARNING.*replacing settings.local.json with template" "$STDERR_OUT"; then
+if grep -q "WARNING.*jq not available" "$STDERR_OUT"; then
   pass "no-jq scenario: replacement warning printed to stderr"
 else
   fail "no-jq scenario: no replacement warning printed"
