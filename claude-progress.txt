@@ -1,3 +1,12 @@
+## Session: 2026-04-01 21:23
+### Completed
+- P2-1 evals-framework complete. 4 evals (2 capability + 2 regression), eval-runner.sh, artifacts/evals/ output. All pass. Vitest 17/17 + hook tests all pass.
+### Next
+- P2-2 module-ablation or P2 evidence plane (verify-run.sh, manifest.json).
+### Blockers
+- None
+---
+
 ## Session: 2026-04-01 19:10
 ### Completed
 - P1 promotion complete. All warns resolved (45ok/0warn/0fail). specs/p1-promotion.md tracked. Executable bits fixed. External review: P1 landed, promotion pending → done. Vitest 17/17 + hook tests all pass.
