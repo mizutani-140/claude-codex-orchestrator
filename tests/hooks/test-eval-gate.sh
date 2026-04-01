@@ -88,4 +88,21 @@ else
   exit 1
 fi
 
+# Test 9: boundary tests required but not run -> FAIL
+TEST_DIR_BT="$TMPDIR_BASE/test-boundary-block"
+mkdir -p "$TEST_DIR_BT/.claude" "$TEST_DIR_BT/hooks/scripts"
+cat > "$TEST_DIR_BT/hooks/scripts/boundary-test-resolver.sh" << 'RESOLVER'
+#!/usr/bin/env bash
+echo '["integration-test","api-contract-test"]'
+RESOLVER
+chmod +x "$TEST_DIR_BT/hooks/scripts/boundary-test-resolver.sh"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"unit tests passed","changed_files":["src/api/routes.ts"],"tests_run":["unit-test"]}' > "$TEST_DIR_BT/.claude/last-implementation-result.json"
+OUTPUT_BT="$(CLAUDE_PROJECT_DIR="$TEST_DIR_BT" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
+if echo "$OUTPUT_BT" | grep -q 'boundary tests not run'; then
+  echo "PASS: boundary tests required but not run triggers FAIL"
+else
+  echo "FAIL: boundary tests not blocking (output: $OUTPUT_BT)"
+  exit 1
+fi
+
 echo "=== All eval gate tests passed ==="

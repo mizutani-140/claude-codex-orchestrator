@@ -26,6 +26,8 @@ mkdir -p "$TEST_DIR"
 cp "$PROJECT_DIR/hooks/scripts/session-end.sh" "$TEST_DIR/"
 cd "$TEST_DIR"
 git init -q
+git config user.name "Test User"
+git config user.email "test@example.com"
 touch claude-progress.txt feature-list.json
 echo '{"version":1,"features":[{"id":"test","title":"t","status":"pending","passes":false,"acceptance":"x"}]}' > feature-list.json
 git add -A && git commit -m "init" -q

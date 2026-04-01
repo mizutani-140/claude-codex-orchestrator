@@ -7,10 +7,10 @@
 CODEX_MODEL_IMPLEMENT="${CODEX_MODEL_IMPLEMENT:-gpt-5.4}"
 
 # Review/critique: fast, good reasoning, low latency
-CODEX_MODEL_REVIEW="${CODEX_MODEL_REVIEW:-gpt-5.4}"
+CODEX_MODEL_REVIEW="${CODEX_MODEL_REVIEW:-gpt-5.4-mini}"
 
 # Output-only retry: cheapest possible
-CODEX_MODEL_RETRY="${CODEX_MODEL_RETRY:-gpt-5.4}"
+CODEX_MODEL_RETRY="${CODEX_MODEL_RETRY:-gpt-5.4-mini}"
 
 # Reasoning effort for implementation — fixed to high for accuracy
 CODEX_REASONING_EFFORT="${CODEX_REASONING_EFFORT:-high}"

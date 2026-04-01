@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "features": [
     {
       "id": "harness-foundation",
@@ -21,59 +21,50 @@
       "status": "done",
       "passes": true,
       "acceptance": "codex-implement.sh enforces testing, guard-bash-policy.sh allows new scripts",
-      "depends_on": [
-        "harness-foundation"
-      ]
+      "depends_on": ["harness-foundation"]
     },
     {
       "id": "p1-session-artifact-migration",
       "title": "Migrate .claude/last-* to .claude/sessions/<id>/ scoped storage",
-      "status": "needs-review",
+      "status": "done",
       "passes": true,
-      "acceptance": "All gate/review artifacts written to .claude/sessions/<id>/. Legacy .claude/last-* paths eliminated from write paths. session-util.sh is sole accessor. All existing tests pass.",
-      "depends_on": [
-        "harness-foundation"
-      ]
+      "acceptance": "All gate/review artifacts written to .claude/sessions/<id>/. Legacy .claude/last-* paths eliminated from write paths. session-util.sh is sole accessor. All existing tests pass."
     },
     {
       "id": "p1-boundary-test-resolver",
       "title": "Connect boundary-test-map.json to deterministic resolver",
-      "status": "needs-review",
+      "status": "done",
       "passes": true,
-      "acceptance": "Given a changed file list, resolver returns exact test commands. No ambiguity in which boundary tests to run. codex-implement.sh uses resolver output.",
-      "depends_on": [
-        "harness-foundation"
-      ]
+      "acceptance": "Given a changed file list, resolver returns exact test commands. No ambiguity in which boundary tests to run. codex-implement.sh uses resolver output."
     },
     {
       "id": "p1-orch-health-split",
       "title": "Split orch-health into check (fast CI) and doctor (diagnostic)",
-      "status": "needs-review",
+      "status": "done",
       "passes": true,
-      "acceptance": "pnpm run check is fast (<2s) and CI-safe. pnpm run doctor gives detailed diagnostics. init.sh uses check.",
-      "depends_on": [
-        "harness-foundation"
-      ]
+      "acceptance": "pnpm run check is fast (<2s) and CI-safe. pnpm run doctor gives detailed diagnostics. init.sh uses check."
     },
     {
       "id": "p1-untrack-settings-local",
       "title": "Remove .claude/settings.local.json from tracked source of truth",
       "status": "done",
       "passes": true,
-      "acceptance": "settings.local.json is in .gitignore. A canonical template or generation script exists. No test depends on tracked settings.local.json content.",
-      "depends_on": [
-        "harness-foundation"
-      ]
+      "acceptance": "settings.local.json is in .gitignore. A canonical template or generation script exists. No test depends on tracked settings.local.json content."
     },
     {
       "id": "p1-bootstrap-cleanup",
       "title": "Explicit packageManager, platform-clean install, bootstrap consolidation",
-      "status": "needs-review",
+      "status": "done",
       "passes": true,
-      "acceptance": "package.json has packageManager field. Fresh clone + pnpm install + pnpm test passes on clean env. init.sh verifies prerequisites.",
-      "depends_on": [
-        "harness-foundation"
-      ]
+      "acceptance": "package.json has packageManager field. Fresh clone + pnpm install + pnpm test passes on clean env. init.sh verifies prerequisites."
+    },
+    {
+      "id": "p1-promotion",
+      "title": "P1 promotion: close gaps identified in external review",
+      "status": "in-progress",
+      "passes": false,
+      "acceptance": "1) pnpm test runs hook shell tests. 2) session-end.sh does not downgrade done features. 3) test-session-scripts.sh handles missing git identity. 4) boundary resolver blocks in eval gate (not advisory). 5) model-router defaults are correct (review/retry=gpt-5.4-mini). 6) settings migration strips broad Bash wildcards.",
+      "depends_on": ["p1-bootstrap-cleanup"]
     },
     {
       "id": "p2-evals-framework",
@@ -81,9 +72,7 @@
       "status": "pending",
       "passes": false,
       "acceptance": "eval runner executes capability and regression evals. Results are machine-readable JSON.",
-      "depends_on": [
-        "p1-orch-health-split"
-      ]
+      "depends_on": ["p1-promotion"]
     },
     {
       "id": "p2-module-ablation",
@@ -91,9 +80,7 @@
       "status": "pending",
       "passes": false,
       "acceptance": "Runner can disable individual harness modules and measure impact on eval scores.",
-      "depends_on": [
-        "p2-evals-framework"
-      ]
+      "depends_on": ["p2-evals-framework"]
     },
     {
       "id": "p2-model-router-v2",
@@ -101,9 +88,7 @@
       "status": "pending",
       "passes": false,
       "acceptance": "Router selects model based on task complexity, file count, and historical performance.",
-      "depends_on": [
-        "p2-evals-framework"
-      ]
+      "depends_on": ["p2-evals-framework"]
     },
     {
       "id": "p2-harness-branching",
@@ -111,9 +96,7 @@
       "status": "pending",
       "passes": false,
       "acceptance": "Harness changes go to candidate branch first. Promotion requires harness-evals PASS.",
-      "depends_on": [
-        "p2-evals-framework"
-      ]
+      "depends_on": ["p2-evals-framework"]
     }
   ]
 }

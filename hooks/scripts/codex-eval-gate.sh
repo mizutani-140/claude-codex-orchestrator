@@ -73,8 +73,7 @@ if [[ -n "$CONTRACT_CONTENT" ]]; then
   : # Contract exists but verification is deferred to future enhancement
 fi
 
-# Check 5: boundary test verification (post-implementation)
-# Resolve required boundary tests from actual changed files
+# Check 5: boundary test verification (post-implementation) — BLOCKING
 CHANGED_FILES="$(echo "$IMPL" | jq -r '.changed_files[]? // empty' 2>/dev/null || echo "")"
 if [[ -n "$CHANGED_FILES" ]]; then
   SCRIPT_DIR_EVAL="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -82,9 +81,15 @@ if [[ -n "$CHANGED_FILES" ]]; then
     REQUIRED_BOUNDARY="$(echo "$CHANGED_FILES" | bash "$SCRIPT_DIR_EVAL/boundary-test-resolver.sh" 2>/dev/null || echo "[]")"
     if [[ "$REQUIRED_BOUNDARY" != "[]" ]]; then
       TESTS_RUN="$(echo "$IMPL" | jq -r '.tests_run[]? // empty' 2>/dev/null || echo "")"
-      # Log required boundary tests but do not block (advisory for now)
-      # Future: verify REQUIRED_BOUNDARY types appear in TESTS_RUN
-      :
+      MISSING_BOUNDARY=""
+      for bt in $(echo "$REQUIRED_BOUNDARY" | jq -r '.[]' 2>/dev/null); do
+        if ! echo "$TESTS_RUN" | grep -qi "$bt"; then
+          MISSING_BOUNDARY="$MISSING_BOUNDARY $bt"
+        fi
+      done
+      if [[ -n "${MISSING_BOUNDARY// }" ]]; then
+        FAILURES+=("Required boundary tests not run:$MISSING_BOUNDARY")
+      fi
     fi
   fi
 fi

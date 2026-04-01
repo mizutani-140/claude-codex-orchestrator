@@ -23,7 +23,7 @@ else
 fi
 
 # Test 2b: model-router.sh uses supported default models
-if [[ "$CODEX_MODEL_IMPLEMENT" == "gpt-5.4" && "$CODEX_MODEL_REVIEW" == "gpt-5.4" && "$CODEX_MODEL_RETRY" == "gpt-5.4" ]]; then
+if [[ "$CODEX_MODEL_IMPLEMENT" == "gpt-5.4" && "$CODEX_MODEL_REVIEW" == "gpt-5.4-mini" && "$CODEX_MODEL_RETRY" == "gpt-5.4-mini" ]]; then
   echo "PASS: model-router.sh uses supported default models"
 else
   echo "FAIL: unsupported defaults implement=$CODEX_MODEL_IMPLEMENT review=$CODEX_MODEL_REVIEW retry=$CODEX_MODEL_RETRY"

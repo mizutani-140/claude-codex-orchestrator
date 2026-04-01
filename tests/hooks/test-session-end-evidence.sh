@@ -12,6 +12,8 @@ setup_test_env() {
   mkdir -p "$dir/.claude/sessions/test-sess"
   cd "$dir"
   git init -q
+  git config user.name "Test User"
+  git config user.email "test@example.com"
   echo '{"version":1,"features":[{"id":"feat1","title":"t","status":"pending","passes":false,"acceptance":"x"}]}' > feature-list.json
   touch claude-progress.txt
   printf 'test-sess' > "$dir/.claude/current-session"
@@ -170,6 +172,23 @@ if [[ "$STATUS" == "blocked" ]]; then
   echo "PASS: failed -> blocked"
 else
   echo "FAIL: expected blocked, got $STATUS"
+  exit 1
+fi
+
+# Test 10: already-done feature is not downgraded
+TEST10="$TMPDIR_BASE/test10"
+mkdir -p "$TEST10"
+setup_test_env "$TEST10"
+cd "$TEST10"
+echo '{"version":1,"features":[{"id":"feat1","title":"t","status":"done","passes":true,"acceptance":"x"}]}' > feature-list.json
+git add -A && git commit -m "mark done" -q
+bash session-end.sh "More work" "Continue" "None" "feat1" "partial" "" 2>/dev/null || true
+STATUS="$(jq -r '.features[0].status' feature-list.json)"
+PASSES="$(jq -r '.features[0].passes' feature-list.json)"
+if [[ "$STATUS" == "done" && "$PASSES" == "true" ]]; then
+  echo "PASS: already-done feature is not downgraded"
+else
+  echo "FAIL: already-done feature was downgraded to $STATUS/$PASSES"
   exit 1
 fi
 

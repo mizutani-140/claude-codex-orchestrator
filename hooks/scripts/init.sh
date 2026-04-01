@@ -60,7 +60,12 @@ if [[ -f "$SETTINGS_TEMPLATE" ]]; then
   elif command -v jq >/dev/null 2>&1; then
     # Existing file: surgically update hooks only, preserve everything else
     TEMPLATE_HOOKS="$(jq '.hooks' "$SETTINGS_TEMPLATE")"
-    jq --argjson hooks "$TEMPLATE_HOOKS" '.hooks = $hooks' "$SETTINGS_LOCAL" > "${SETTINGS_LOCAL}.tmp" \
+    jq --argjson hooks "$TEMPLATE_HOOKS" '
+      .hooks = $hooks |
+      if .permissions.allow then
+        .permissions.allow |= [.[] | select(test("^Bash\\((bash|[A-Z_]+=.*bash):\\*\\)$") | not)]
+      else . end
+    ' "$SETTINGS_LOCAL" > "${SETTINGS_LOCAL}.tmp" \
       && mv "${SETTINGS_LOCAL}.tmp" "$SETTINGS_LOCAL"
   else
     echo "WARNING: jq not available, skipping hooks sync for settings.local.json" >&2

@@ -23,7 +23,12 @@ run_settings_sync() {
       cp "$settings_template" "$settings_local"
     elif command -v jq >/dev/null 2>&1; then
       TEMPLATE_HOOKS="$(jq '.hooks' "$settings_template")"
-      jq --argjson hooks "$TEMPLATE_HOOKS" '.hooks = $hooks' "$settings_local" > "${settings_local}.tmp" \
+      jq --argjson hooks "$TEMPLATE_HOOKS" '
+        .hooks = $hooks |
+        if .permissions.allow then
+          .permissions.allow |= [.[] | select(test("^Bash\\((bash|[A-Z_]+=.*bash):\\*\\)$") | not)]
+        else . end
+      ' "$settings_local" > "${settings_local}.tmp" \
         && mv "${settings_local}.tmp" "$settings_local"
     else
       echo "WARNING: jq not available, skipping hooks sync for settings.local.json" >&2
@@ -172,11 +177,49 @@ else
   fail "init.sh missing jq-missing warning"
 fi
 
-if grep -q 'Bash(bash:\*)' "$REAL_PROJECT_DIR/hooks/scripts/init.sh"; then
-  fail "init.sh still contains Bash(bash:*) permission filtering"
+if grep -q 'select(test.*Bash' "$REAL_PROJECT_DIR/hooks/scripts/init.sh"; then
+  pass "init.sh strips broad Bash wildcard permissions"
 else
-  pass "init.sh does not filter permissions"
+  fail "init.sh does not strip broad Bash wildcard permissions"
 fi
+
+# --- Test 6: Broad Bash wildcards are stripped during sync ---
+TMPDIR6="$(setup_temp_repo)"
+cat > "$TMPDIR6/.claude/settings.local.json" <<'BROAD'
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash:*)",
+      "Bash(git:*)",
+      "Bash(CLAUDE_PROJECT_DIR=/some/path bash:*)",
+      "Bash(ls:*)"
+    ]
+  },
+  "hooks": {}
+}
+BROAD
+
+run_settings_sync "$TMPDIR6"
+
+REMAINING="$(jq -r '.permissions.allow[]' "$TMPDIR6/.claude/settings.local.json" 2>/dev/null)"
+if echo "$REMAINING" | grep -q 'Bash(git:\*)' && echo "$REMAINING" | grep -q 'Bash(ls:\*)'; then
+  pass "non-broad Bash permissions preserved"
+else
+  fail "non-broad Bash permissions were incorrectly stripped"
+fi
+
+if echo "$REMAINING" | grep -q 'Bash(bash:\*)'; then
+  fail "broad Bash(bash:*) was not stripped"
+else
+  pass "broad Bash(bash:*) stripped successfully"
+fi
+
+if echo "$REMAINING" | grep -q 'CLAUDE_PROJECT_DIR.*bash:\*'; then
+  fail "broad Bash(CLAUDE_PROJECT_DIR=... bash:*) was not stripped"
+else
+  pass "broad Bash(CLAUDE_PROJECT_DIR=... bash:*) stripped successfully"
+fi
+rm -rf "$TMPDIR6"
 
 # --- Results ---
 echo ""
