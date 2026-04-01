@@ -21,7 +21,9 @@
       "status": "done",
       "passes": true,
       "acceptance": "codex-implement.sh enforces testing, guard-bash-policy.sh allows new scripts",
-      "depends_on": ["harness-foundation"]
+      "depends_on": [
+        "harness-foundation"
+      ]
     },
     {
       "id": "p1-session-artifact-migration",
@@ -61,10 +63,12 @@
     {
       "id": "p1-promotion",
       "title": "P1 promotion: close gaps identified in external review",
-      "status": "in-progress",
+      "status": "needs-review",
       "passes": false,
       "acceptance": "1) pnpm test runs hook shell tests. 2) session-end.sh does not downgrade done features. 3) test-session-scripts.sh handles missing git identity. 4) boundary resolver blocks in eval gate (not advisory). 5) model-router defaults are correct (review/retry=gpt-5.4-mini). 6) settings migration strips broad Bash wildcards.",
-      "depends_on": ["p1-bootstrap-cleanup"]
+      "depends_on": [
+        "p1-bootstrap-cleanup"
+      ]
     },
     {
       "id": "p2-evals-framework",
@@ -72,7 +76,9 @@
       "status": "pending",
       "passes": false,
       "acceptance": "eval runner executes capability and regression evals. Results are machine-readable JSON.",
-      "depends_on": ["p1-promotion"]
+      "depends_on": [
+        "p1-promotion"
+      ]
     },
     {
       "id": "p2-module-ablation",
@@ -80,7 +86,9 @@
       "status": "pending",
       "passes": false,
       "acceptance": "Runner can disable individual harness modules and measure impact on eval scores.",
-      "depends_on": ["p2-evals-framework"]
+      "depends_on": [
+        "p2-evals-framework"
+      ]
     },
     {
       "id": "p2-model-router-v2",
@@ -88,7 +96,9 @@
       "status": "pending",
       "passes": false,
       "acceptance": "Router selects model based on task complexity, file count, and historical performance.",
-      "depends_on": ["p2-evals-framework"]
+      "depends_on": [
+        "p2-evals-framework"
+      ]
     },
     {
       "id": "p2-harness-branching",
@@ -96,7 +106,9 @@
       "status": "pending",
       "passes": false,
       "acceptance": "Harness changes go to candidate branch first. Promotion requires harness-evals PASS.",
-      "depends_on": ["p2-evals-framework"]
+      "depends_on": [
+        "p2-evals-framework"
+      ]
     }
   ]
 }

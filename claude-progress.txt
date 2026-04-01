@@ -1,3 +1,12 @@
+## Session: 2026-04-01 14:21
+### Completed
+- P1 promotion complete. All 6 external review gaps closed: pnpm test integrates hook shell tests, session-end done-guard, git identity portability, boundary blocking enforcement, model-router defaults fixed (review/retry=gpt-5.4-mini), settings wildcard stripping. Full test suite: vitest 13/13 + hook tests 20/20 all via pnpm test.
+### Next
+- P2 readiness. Evidence plane and session-end.sh decomposition remain for future consideration.
+### Blockers
+- None
+---
+
 ## Session: 2026-04-01 13:12
 ### Completed
 - P1 全完了。P1-4 untrack-settings-local: テンプレート+生成メカニズム、init.sh で merge/validate。P1-5 bootstrap-cleanup: packageManager、prerequisite checks。vitest 13/13、hook tests 20/20。
