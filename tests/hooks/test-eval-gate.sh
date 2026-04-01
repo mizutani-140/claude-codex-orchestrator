@@ -165,24 +165,23 @@ else
   exit 1
 fi
 
-# Test 13: substring match in command string passes boundary check
-TEST_DIR_EXACT="$TMPDIR_BASE/test-exact-match"
+# Test 13: echo command with boundary type name does NOT satisfy gate (not a test runner)
+TEST_DIR_EXACT="$TMPDIR_BASE/test-echo-bypass"
 mkdir -p "$TEST_DIR_EXACT/.claude"
 REAL_RESOLVER_BAK_EXACT="$TMPDIR_BASE/boundary-test-resolver.sh.exact.bak"
 cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_EXACT"
 cat > "$REAL_RESOLVER" << 'RESOLVER'
 #!/usr/bin/env bash
-echo '["api-test"]'
+echo '["integration-test","api-contract-test"]'
 RESOLVER
 chmod +x "$REAL_RESOLVER"
-echo '{"status":"DONE","tests_status":"PASS","test_log":"all tests passed","changed_files":["src/api.ts"],"tests_run":["bash tests/api-test.sh","unit-test"]}' > "$TEST_DIR_EXACT/.claude/last-implementation-result.json"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["echo integration-test","echo api-contract-test"]}' > "$TEST_DIR_EXACT/.claude/last-implementation-result.json"
 OUTPUT_EXACT="$(CLAUDE_PROJECT_DIR="$TEST_DIR_EXACT" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
 mv "$REAL_RESOLVER_BAK_EXACT" "$REAL_RESOLVER"
-EXACT_STATUS="$(echo "$OUTPUT_EXACT" | head -1 | jq -r '.status // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")"
-if [[ "$EXACT_STATUS" == "PASS" ]]; then
-  echo "PASS: substring match in command string passes boundary check"
+if echo "$OUTPUT_EXACT" | grep -q '"FAIL"'; then
+  echo "PASS: echo command does not satisfy boundary gate"
 else
-  echo "FAIL: substring match did not pass boundary check (output: $OUTPUT_EXACT)"
+  echo "FAIL: echo command should not satisfy boundary gate"
   exit 1
 fi
 
@@ -223,6 +222,27 @@ if echo "$OUTPUT_SECURITY_LOG" | grep -q 'boundary tests not run'; then
   echo "PASS: security-scan in test_log alone does NOT satisfy boundary check"
 else
   echo "FAIL: security-scan in test_log alone should not satisfy boundary check (output: $OUTPUT_SECURITY_LOG)"
+  exit 1
+fi
+
+# Test 16: real test runner command satisfies boundary gate
+TEST_DIR_REAL="$TMPDIR_BASE/test-real-runner"
+mkdir -p "$TEST_DIR_REAL/.claude"
+REAL_RESOLVER_BAK_REAL="$TMPDIR_BASE/boundary-test-resolver.sh.real.bak"
+cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_REAL"
+cat > "$REAL_RESOLVER" << 'RESOLVER'
+#!/usr/bin/env bash
+echo '["integration-test","api-contract-test"]'
+RESOLVER
+chmod +x "$REAL_RESOLVER"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["bash tests/integration-test.sh","pnpm test:api-contract-test"]}' > "$TEST_DIR_REAL/.claude/last-implementation-result.json"
+OUTPUT_REAL="$(CLAUDE_PROJECT_DIR="$TEST_DIR_REAL" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
+mv "$REAL_RESOLVER_BAK_REAL" "$REAL_RESOLVER"
+REAL_STATUS="$(echo "$OUTPUT_REAL" | head -1 | jq -r '.status // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")"
+if [[ "$REAL_STATUS" == "PASS" ]]; then
+  echo "PASS: real test runner satisfies boundary gate"
+else
+  echo "FAIL: real test runner should satisfy boundary gate (output: $OUTPUT_REAL)"
   exit 1
 fi
 
