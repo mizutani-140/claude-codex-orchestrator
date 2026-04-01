@@ -75,7 +75,11 @@ fi
 
 # Check 5: boundary test verification (fail-closed, structured)
 # Derive changed_files from git (machine evidence), fall back to model JSON
-GIT_CHANGED="$(git -C "$PROJECT_DIR" diff --name-only HEAD 2>/dev/null || echo "")"
+GIT_CHANGED="$(
+  { git -C "$PROJECT_DIR" diff --name-only HEAD 2>/dev/null || true; \
+    git -C "$PROJECT_DIR" ls-files --others --exclude-standard 2>/dev/null || true; } \
+  | sort -u
+)"
 if [[ -n "$GIT_CHANGED" ]]; then
   CHANGED_FILES="$GIT_CHANGED"
 else

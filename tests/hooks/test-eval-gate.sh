@@ -388,4 +388,40 @@ else
   exit 1
 fi
 
+# Test 19: untracked new files are included in boundary resolution
+TEST_DIR_UNTRACKED="$TMPDIR_BASE/test-untracked"
+mkdir -p "$TEST_DIR_UNTRACKED/.claude" "$TEST_DIR_UNTRACKED/hooks/scripts"
+cd "$TEST_DIR_UNTRACKED"
+git init -q
+git config user.name "Test"
+git config user.email "test@test.com"
+touch initial.txt
+git add initial.txt
+git commit -m "init" -q
+# Create impl result with boundary_tests_run empty
+cat > "$TEST_DIR_UNTRACKED/.claude/last-implementation-result.json" <<'IMPL'
+{
+  "status": "DONE",
+  "tests_status": "PASS",
+  "test_log": "tests passed",
+  "tests_run": ["pnpm test"],
+  "boundary_tests_run": [],
+  "changed_files": []
+}
+IMPL
+# Create an untracked file matching api pattern
+mkdir -p "$TEST_DIR_UNTRACKED/src/api"
+echo "new" > "$TEST_DIR_UNTRACKED/src/api/routes.ts"
+# Copy resolver
+cp "$PROJECT_DIR/hooks/scripts/boundary-test-map.json" "$TEST_DIR_UNTRACKED/hooks/scripts/"
+cp "$PROJECT_DIR/hooks/scripts/boundary-test-resolver.sh" "$TEST_DIR_UNTRACKED/hooks/scripts/"
+chmod +x "$TEST_DIR_UNTRACKED/hooks/scripts/boundary-test-resolver.sh"
+OUTPUT_UNTRACKED="$(CLAUDE_PROJECT_DIR="$TEST_DIR_UNTRACKED" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
+if echo "$OUTPUT_UNTRACKED" | grep -q '"FAIL"'; then
+  echo "PASS: untracked api file triggers boundary test requirement"
+else
+  echo "FAIL: untracked api file should trigger boundary test requirement"
+  exit 1
+fi
+
 echo "=== All eval gate tests passed ==="
