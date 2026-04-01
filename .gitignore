@@ -16,6 +16,7 @@
 # Build & dependencies
 node_modules/
 dist/
+artifacts/
 
 # OS
 .DS_Store

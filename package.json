@@ -11,6 +11,7 @@
     "test": "vitest run && bash tests/run-hook-tests.sh",
     "test:unit": "vitest run",
     "test:hooks": "bash tests/run-hook-tests.sh",
+    "eval": "bash hooks/scripts/eval-runner.sh",
     "check": "node dist/orch-health/cli.js check",
     "doctor": "node dist/orch-health/cli.js doctor",
     "status": "node dist/orch-health/cli.js status"

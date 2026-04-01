@@ -73,8 +73,8 @@
     {
       "id": "p2-evals-framework",
       "title": "Add evals/capability/ and evals/regression/ evaluation framework",
-      "status": "pending",
-      "passes": false,
+      "status": "done",
+      "passes": true,
       "acceptance": "eval runner executes capability and regression evals. Results are machine-readable JSON.",
       "depends_on": [
         "p1-promotion"
