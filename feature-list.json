@@ -68,7 +68,7 @@
     {
       "id": "p1-bootstrap-cleanup",
       "title": "Explicit packageManager, platform-clean install, bootstrap consolidation",
-      "status": "done",
+      "status": "needs-review",
       "passes": true,
       "acceptance": "package.json has packageManager field. Fresh clone + pnpm install + pnpm test passes on clean env. init.sh verifies prerequisites.",
       "depends_on": [

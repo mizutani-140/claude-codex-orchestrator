@@ -1,3 +1,12 @@
+## Session: 2026-04-01 13:12
+### Completed
+- P1 全完了。P1-4 untrack-settings-local: テンプレート+生成メカニズム、init.sh で merge/validate。P1-5 bootstrap-cleanup: packageManager、prerequisite checks。vitest 13/13、hook tests 20/20。
+### Next
+- P2-1 evals-framework: capability/regression eval framework の構築。
+### Blockers
+- None
+---
+
 ## Session: 2026-04-01 12:33
 ### Completed
 - P1-3 orch-health-split complete. check (0.19s, pure FS) and doctor (session+artifacts+env). init.sh uses check. 13 vitest pass. Also completed P1-2 boundary-test-resolver earlier this session.
