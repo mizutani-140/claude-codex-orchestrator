@@ -69,29 +69,31 @@ else
   exit 1
 fi
 
-# Test 7: no stale model pins in settings.local.json allowlist
-if [[ -f "$PROJECT_DIR/.claude/settings.local.json" ]]; then
-  STALE_PINS=$(grep -c 'gpt-5\.4-mini' "$PROJECT_DIR/.claude/settings.local.json" || true)
+# Test 7: no stale model pins in settings.template.json
+if [[ -f "$PROJECT_DIR/.claude/settings.template.json" ]]; then
+  STALE_PINS=$(grep -c 'gpt-5\.4-mini' "$PROJECT_DIR/.claude/settings.template.json" || true)
   if [[ "$STALE_PINS" -eq 0 ]]; then
-    echo "PASS: no stale gpt-5.4-mini pins in settings.local.json"
+    echo "PASS: no stale gpt-5.4-mini pins in settings.template.json"
   else
-    echo "FAIL: found $STALE_PINS stale gpt-5.4-mini references in settings.local.json"
+    echo "FAIL: found $STALE_PINS stale gpt-5.4-mini references in settings.template.json"
     exit 1
   fi
 else
-  echo "PASS: no settings.local.json to check (skip)"
+  echo "FAIL: settings.template.json missing"
+  exit 1
 fi
 
-# Test 8: no wildcard bash permission in settings.local.json
-if [[ -f "$PROJECT_DIR/.claude/settings.local.json" ]]; then
-  if grep -q '"Bash(bash:\*)"' "$PROJECT_DIR/.claude/settings.local.json"; then
-    echo "FAIL: Bash(bash:*) wildcard found in settings.local.json"
+# Test 8: no wildcard bash permission in settings.template.json
+if [[ -f "$PROJECT_DIR/.claude/settings.template.json" ]]; then
+  if grep -q '"Bash(bash:\*)"' "$PROJECT_DIR/.claude/settings.template.json"; then
+    echo "FAIL: Bash(bash:*) wildcard found in settings.template.json"
     exit 1
   else
-    echo "PASS: no Bash(bash:*) wildcard in settings.local.json"
+    echo "PASS: no Bash(bash:*) wildcard in settings.template.json"
   fi
 else
-  echo "PASS: no settings.local.json to check (skip)"
+  echo "FAIL: settings.template.json missing"
+  exit 1
 fi
 
 echo "=== All speed optimization tests passed ==="

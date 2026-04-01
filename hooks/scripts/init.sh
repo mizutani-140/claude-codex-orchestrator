@@ -31,6 +31,40 @@ step() {
 
 step "pwd" pwd
 
+# Sync settings.local.json hooks from template
+SETTINGS_LOCAL="$PROJECT_DIR/.claude/settings.local.json"
+SETTINGS_TEMPLATE="$PROJECT_DIR/.claude/settings.template.json"
+if [[ -f "$SETTINGS_TEMPLATE" ]]; then
+  if [[ ! -f "$SETTINGS_LOCAL" ]]; then
+    cp "$SETTINGS_TEMPLATE" "$SETTINGS_LOCAL"
+  else
+    if command -v jq >/dev/null 2>&1; then
+      LOCAL_PERMS="$(
+        jq '
+          {
+            "allow": (
+              [
+                .. | objects | .allow? | arrays | .[]? | select(. != "Bash(bash:*)")
+              ] | unique
+            )
+          }
+        ' "$SETTINGS_LOCAL" 2>/dev/null || echo '{"allow":[]}'
+      )"
+      MERGED="$(jq --argjson perms "$LOCAL_PERMS" '. + {permissions: $perms}' "$SETTINGS_TEMPLATE" 2>/dev/null)"
+      if [[ -n "$MERGED" ]]; then
+        printf '%s\n' "$MERGED" > "$SETTINGS_LOCAL"
+        # Validate merge result contains required hooks
+        if ! grep -q 'codex-eval-gate' "$SETTINGS_LOCAL" 2>/dev/null; then
+          cp "$SETTINGS_TEMPLATE" "$SETTINGS_LOCAL"
+        fi
+      fi
+    else
+      # jq not available: overwrite local with template to ensure safe hooks
+      cp "$SETTINGS_TEMPLATE" "$SETTINGS_LOCAL"
+    fi
+  fi
+fi
+
 if [[ -d node_modules ]] && [[ -f pnpm-lock.yaml ]]; then
   step "pnpm-install" true
 else

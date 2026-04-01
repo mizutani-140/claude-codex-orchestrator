@@ -58,8 +58,8 @@
     {
       "id": "p1-untrack-settings-local",
       "title": "Remove .claude/settings.local.json from tracked source of truth",
-      "status": "pending",
-      "passes": false,
+      "status": "done",
+      "passes": true,
       "acceptance": "settings.local.json is in .gitignore. A canonical template or generation script exists. No test depends on tracked settings.local.json content.",
       "depends_on": [
         "harness-foundation"
