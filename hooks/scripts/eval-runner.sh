@@ -4,7 +4,6 @@ set -euo pipefail
 PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 FILE_TIMESTAMP="$(date -u +"%Y%m%dT%H%M%SZ")"
 JSON_TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-ARTIFACT_DIR="$PROJECT_DIR/artifacts/evals"
 
 EVAL_OUTPUTS=""
 PASS_COUNT=0
@@ -122,10 +121,12 @@ RESULT="$(jq -cn \
 # Always emit to stdout first
 printf '%s\n' "$RESULT"
 
-# Best-effort artifact persistence
-if mkdir -p "$ARTIFACT_DIR" 2>/dev/null; then
-  printf '%s\n' "$RESULT" > "$ARTIFACT_DIR/${FILE_TIMESTAMP}-$$.json" 2>/dev/null || true
-fi
+# Best-effort artifact persistence (never pollute stdout/stderr)
+{
+  ARTIFACTS_DIR="$PROJECT_DIR/artifacts/evals"
+  mkdir -p "$ARTIFACTS_DIR" && \
+  printf '%s\n' "$RESULT" > "$ARTIFACTS_DIR/${FILE_TIMESTAMP}-$$.json"
+} 2>/dev/null || true
 
 # Exit with failure if any eval failed
 if [[ "$FAIL_COUNT" -gt 0 ]]; then

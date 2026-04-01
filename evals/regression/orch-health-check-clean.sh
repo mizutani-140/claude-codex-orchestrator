@@ -18,7 +18,7 @@ OUTPUT="$(node "$CLI" check 2>/dev/null || true)"
 FAIL_COUNT="$(echo "$OUTPUT" | jq '.summary.fail' 2>/dev/null || echo "")"
 
 if [[ -z "$FAIL_COUNT" ]]; then
-  echo '{"name":"orch-health-check-clean","category":"regression","status":"SKIP","detail":"unparsable output"}'
+  echo '{"name":"orch-health-check-clean","category":"regression","status":"FAIL","detail":"orch-health check output was not valid JSON"}'
 elif [[ "$FAIL_COUNT" == "0" ]]; then
   echo '{"name":"orch-health-check-clean","category":"regression","status":"PASS","detail":"orch-health check: 0 failures"}'
 else
