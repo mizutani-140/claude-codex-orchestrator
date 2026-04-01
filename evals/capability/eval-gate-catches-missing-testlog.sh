@@ -18,7 +18,7 @@ json_result() {
 }
 
 mkdir -p "$TMP_DIR/.claude"
-cat > "$TMP_DIR/.claude/implementation.json" <<'JSON'
+cat > "$TMP_DIR/.claude/last-implementation-result.json" <<'JSON'
 {"status":"DONE","tests_status":"PASS","test_log":""}
 JSON
 

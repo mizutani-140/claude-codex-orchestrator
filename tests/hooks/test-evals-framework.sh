@@ -98,7 +98,7 @@ fi
 rm -rf "$TEMP_EVAL_DIR"
 
 # Test: eval-runner.sh contains timeout detection logic
-if grep -q 'timeout_cmd\|gtimeout' "$RUNNER"; then
+if grep -q 'TIMEOUT_CMD\|gtimeout' "$RUNNER"; then
   pass "eval-runner contains timeout detection logic"
 else
   fail "eval-runner missing timeout detection logic"
