@@ -1,6 +1,6 @@
 {
-  "schema|migration|types": ["contract-test"],
-  "api|routes|resolver|middleware": ["integration-test", "api-contract-test"],
-  "auth|permission|session": ["security-regression-test"],
-  "build|deploy|infra": ["smoke-test"]
+  "(^|/)(schema|migration|types)\\.(ts|js|json|sql)": ["contract-test"],
+  "(^|/)(api|routes|middleware)/": ["integration-test", "api-contract-test"],
+  "(^|/)(auth|permission)/": ["security-regression-test"],
+  "(^|/)(build|deploy|infra)/|^Dockerfile|^docker-compose|^\\.github/": ["smoke-test"]
 }

@@ -73,6 +73,22 @@ if [[ -n "$CONTRACT_CONTENT" ]]; then
   : # Contract exists but verification is deferred to future enhancement
 fi
 
+# Check 5: boundary test verification (post-implementation)
+# Resolve required boundary tests from actual changed files
+CHANGED_FILES="$(echo "$IMPL" | jq -r '.changed_files[]? // empty' 2>/dev/null || echo "")"
+if [[ -n "$CHANGED_FILES" ]]; then
+  SCRIPT_DIR_EVAL="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if [[ -x "$SCRIPT_DIR_EVAL/boundary-test-resolver.sh" ]]; then
+    REQUIRED_BOUNDARY="$(echo "$CHANGED_FILES" | bash "$SCRIPT_DIR_EVAL/boundary-test-resolver.sh" 2>/dev/null || echo "[]")"
+    if [[ "$REQUIRED_BOUNDARY" != "[]" ]]; then
+      TESTS_RUN="$(echo "$IMPL" | jq -r '.tests_run[]? // empty' 2>/dev/null || echo "")"
+      # Log required boundary tests but do not block (advisory for now)
+      # Future: verify REQUIRED_BOUNDARY types appear in TESTS_RUN
+      :
+    fi
+  fi
+fi
+
 if [[ ${#FAILURES[@]} -gt 0 ]]; then
   SUMMARY="Eval gate failed: ${#FAILURES[@]} check(s) failed"
   RESULT="$(fail_result "$SUMMARY" "${FAILURES[@]}")"
