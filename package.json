@@ -2,6 +2,7 @@
   "name": "claude-codex-orchestrator",
   "version": "0.1.0",
   "type": "module",
+  "packageManager": "pnpm@10.11.1",
   "bin": {
     "orch-health": "./dist/orch-health/cli.js"
   },

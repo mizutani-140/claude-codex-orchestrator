@@ -18,6 +18,24 @@ cd "$PROJECT_DIR"
 RESULTS=()
 EXIT=0
 
+# Prerequisites check
+# Expected result step names: prereq-node, prereq-pnpm, prereq-git
+prereq_ok=true
+for cmd in node pnpm git; do
+  if command -v "$cmd" >/dev/null 2>&1; then
+    RESULTS+=("{\"step\":\"prereq-$cmd\",\"status\":\"ok\"}")
+  else
+    RESULTS+=("{\"step\":\"prereq-$cmd\",\"status\":\"fail\"}")
+    prereq_ok=false
+    EXIT=1
+  fi
+done
+
+if [[ "$prereq_ok" != "true" ]]; then
+  printf '{"steps":[%s],"exit_code":%d}\n' "$(IFS=,; echo "${RESULTS[*]}")" "$EXIT"
+  exit "$EXIT"
+fi
+
 step() {
   local name="$1"
   shift
