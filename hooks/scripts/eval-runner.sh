@@ -10,6 +10,7 @@ EVAL_OUTPUTS=""
 PASS_COUNT=0
 FAIL_COUNT=0
 SKIP_COUNT=0
+TIMEOUT_CMD=""
 
 append_eval() {
   local json="$1"
@@ -41,6 +42,34 @@ record_output() {
   esac
 }
 
+run_single_eval() {
+  local eval_file="$1"
+  local eval_name
+  eval_name="$(basename "$eval_file" .sh)"
+  local output=""
+  local exit_code=0
+
+  if [[ -n "$TIMEOUT_CMD" ]]; then
+    output="$($TIMEOUT_CMD bash "$eval_file" 2>/dev/null)" || exit_code=$?
+  else
+    output="$(bash "$eval_file" 2>/dev/null)" || exit_code=$?
+  fi
+
+  # If output is valid JSON, use it regardless of exit code
+  if echo "$output" | jq -e . >/dev/null 2>&1; then
+    echo "$output"
+    return 0
+  fi
+
+  # No valid JSON: synthesize failure
+  local detail="eval failed (exit $exit_code)"
+  if [[ $exit_code -eq 124 ]]; then
+    detail="eval timed out after 60s"
+  fi
+  jq -n --arg name "$eval_name" --arg detail "$detail" \
+    '{name: $name, category: "unknown", status: "FAIL", detail: $detail}'
+}
+
 run_eval_dir() {
   local dir="$1"
   local found=0
@@ -51,21 +80,18 @@ run_eval_dir() {
   fi
 
   # Determine timeout command (GNU coreutils or macOS gtimeout)
-  local timeout_cmd=""
   if command -v timeout >/dev/null 2>&1; then
-    timeout_cmd="timeout 60"
+    TIMEOUT_CMD="timeout 60"
   elif command -v gtimeout >/dev/null 2>&1; then
-    timeout_cmd="gtimeout 60"
+    TIMEOUT_CMD="gtimeout 60"
+  else
+    TIMEOUT_CMD=""
   fi
 
   while IFS= read -r eval_script; do
     found=1
     if [[ -x "$eval_script" ]]; then
-      if [[ -n "$timeout_cmd" ]]; then
-        record_output "$eval_script" "$($timeout_cmd bash "$eval_script" 2>&1 || echo "{\"name\":\"$(basename "$eval_script" .sh)\",\"category\":\"unknown\",\"status\":\"FAIL\",\"detail\":\"eval timed out or failed\"}")"
-      else
-        record_output "$eval_script" "$("$eval_script" 2>&1 || true)"
-      fi
+      record_output "$eval_script" "$(run_single_eval "$eval_script")"
     else
       record_output "$eval_script" "not executable"
     fi
