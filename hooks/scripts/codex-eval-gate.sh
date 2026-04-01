@@ -76,14 +76,21 @@ fi
 # Check 5: boundary test verification (fail-closed, structured)
 # Use session base commit for accurate change detection
 BASE_COMMIT="$(get_session_base_commit 2>/dev/null || echo "")"
-if [[ -n "$BASE_COMMIT" ]] && git -C "$PROJECT_DIR" rev-parse --verify "$BASE_COMMIT" >/dev/null 2>&1; then
-  GIT_CHANGED="$(
-    { git -C "$PROJECT_DIR" diff --name-only "$BASE_COMMIT" 2>/dev/null || true; \
-      git -C "$PROJECT_DIR" ls-files --others --exclude-standard 2>/dev/null || true; } \
-    | sort -u
-  )"
+if [[ -n "$BASE_COMMIT" ]]; then
+  if git -C "$PROJECT_DIR" rev-parse --verify "$BASE_COMMIT" >/dev/null 2>&1; then
+    # Valid session base commit
+    GIT_CHANGED="$(
+      { git -C "$PROJECT_DIR" diff --name-only "$BASE_COMMIT" 2>/dev/null || true; \
+        git -C "$PROJECT_DIR" ls-files --others --exclude-standard 2>/dev/null || true; } \
+      | sort -u
+    )"
+  else
+    # Session base commit exists but is invalid: fail closed
+    FAILURES+=("Session base commit '$BASE_COMMIT' is invalid; cannot verify boundary tests")
+    GIT_CHANGED=""
+  fi
 else
-  # Fallback: use HEAD if no session base commit available
+  # No session base commit: fallback to HEAD
   GIT_CHANGED="$(
     { git -C "$PROJECT_DIR" diff --name-only HEAD 2>/dev/null || true; \
       git -C "$PROJECT_DIR" ls-files --others --exclude-standard 2>/dev/null || true; } \
