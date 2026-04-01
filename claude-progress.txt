@@ -1,3 +1,12 @@
+## Session: 2026-04-01 18:37
+### Completed
+- P1 promotion: structured boundary_tests_run + exact match, session-end state normalization, settings-sync.sh extraction, status.ts session-aware reads, complete .gitignore. External review: Strong P1 candidate (85-90%). Vitest 17/17, hook tests all pass.
+### Next
+- P2 entry: evidence plane (manifest.json, verify-run.sh, boundary-results.json). Boundary attestation provenance still Codex-internal.
+### Blockers
+- None
+---
+
 ## Session: 2026-04-01 15:05
 ### Completed
 - P1 promotion round 2: settings-sync.sh extracted as shared helper (production/test same code path), .gitignore completed for all runtime artifacts, architecture gate fixes (fail-closed boundary, complete wildcard strip). pnpm test runs vitest 13/13 + hook tests 20/20.
