@@ -1,3 +1,12 @@
+## Session: 2026-04-01 12:33
+### Completed
+- P1-3 orch-health-split complete. check (0.19s, pure FS) and doctor (session+artifacts+env). init.sh uses check. 13 vitest pass. Also completed P1-2 boundary-test-resolver earlier this session.
+### Next
+- P1-4 untrack-settings-local: Remove .claude/settings.local.json from git tracking.
+### Blockers
+- None
+---
+
 ## Session: 2026-04-01 12:16
 ### Completed
 - P1-2 boundary-test-resolver complete. boundary-test-resolver.sh deterministically resolves changed files to boundary test types via regex. Integrated into codex-eval-gate.sh for post-impl verification. 16 new tests. Also fixed p1-session-artifact-migration status.
