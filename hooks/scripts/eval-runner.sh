@@ -5,7 +5,6 @@ PROJECT_DIR="${PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}
 FILE_TIMESTAMP="$(date -u +"%Y%m%dT%H%M%SZ")"
 JSON_TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 ARTIFACT_DIR="$PROJECT_DIR/artifacts/evals"
-mkdir -p "$ARTIFACT_DIR"
 
 EVAL_OUTPUTS=""
 PASS_COUNT=0
@@ -82,5 +81,10 @@ RESULT="$(jq -cn \
   --argjson skip "$SKIP_COUNT" \
   '{timestamp:$timestamp, evals:$evals, summary:{pass:$pass, fail:$fail, skip:$skip}}')"
 
-printf '%s\n' "$RESULT" > "$ARTIFACT_DIR/$FILE_TIMESTAMP.json"
+# Always emit to stdout first
 printf '%s\n' "$RESULT"
+
+# Best-effort artifact persistence
+if mkdir -p "$ARTIFACT_DIR" 2>/dev/null; then
+  printf '%s\n' "$RESULT" > "$ARTIFACT_DIR/${FILE_TIMESTAMP}-$$.json" 2>/dev/null || true
+fi

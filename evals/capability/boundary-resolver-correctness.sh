@@ -22,9 +22,10 @@ fi
 
 OUTPUT="$(printf '%s\n' "src/api/routes.ts" | bash "$RESOLVER" 2>&1 || true)"
 
-if echo "$OUTPUT" | jq -e 'type == "array"' >/dev/null 2>&1 \
-  && echo "$OUTPUT" | jq -e 'any(.[]; . == "integration-test")' >/dev/null 2>&1; then
-  json_result "PASS" "resolver returned integration-test for src/api/routes.ts"
+if echo "$OUTPUT" | jq -e '. | length >= 2' >/dev/null 2>&1 \
+  && echo "$OUTPUT" | grep -q 'integration-test' \
+  && echo "$OUTPUT" | grep -q 'api-contract-test'; then
+  json_result "PASS" "resolver returned integration-test and api-contract-test for src/api/routes.ts"
 else
   json_result "FAIL" "unexpected resolver output: $OUTPUT"
 fi
