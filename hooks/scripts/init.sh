@@ -39,7 +39,7 @@ fi
 
 step "pnpm-build" pnpm build
 step "codex-cli" command -v codex
-step "pnpm-test" pnpm test
+step "pnpm-check" pnpm run check
 
 printf '{"steps":[%s],"exit_code":%d}\n' "$(IFS=,; echo "${RESULTS[*]}")" "$EXIT"
 exit "$EXIT"

@@ -60,7 +60,14 @@
       "Bash(bash tests/hooks/test-speed-optimizations.sh 2>&1)",
       "Bash(bash hooks/scripts/session-start.sh)",
       "Bash(bash tests/hooks/test-speed-optimizations.sh)",
-      "Bash(cp /tmp/guard-bash-policy-head.sh /Users/munou/claude-codex-orchestrator/hooks/scripts/guard-bash-policy.sh)"
+      "Bash(cp /tmp/guard-bash-policy-head.sh /Users/munou/claude-codex-orchestrator/hooks/scripts/guard-bash-policy.sh)",
+      "Bash(bash tests/hooks/test-eval-gate.sh)",
+      "Bash(bash tests/hooks/test-no-legacy-direct-writes.sh)",
+      "Read(//tmp/**)",
+      "Bash(bash tests/hooks/test-boundary-resolver.sh)",
+      "Bash(chmod +x /Users/munou/claude-codex-orchestrator/hooks/scripts/boundary-test-resolver.sh)",
+      "Bash(time pnpm:*)",
+      "Bash(pnpm run:*)"
     ]
   },
   "hooks": {

@@ -26,3 +26,21 @@ export type StatusSummary = {
   timestamp: string;
   entries: StatusEntry[];
 };
+
+export type DoctorResult = {
+  timestamp: string;
+  items: CheckItem[];
+  summary: CheckResult["summary"];
+  session: {
+    sessionId: string | null;
+    baseCommit: string | null;
+    sessionDir: string | null;
+  };
+  artifacts: StatusEntry[];
+  environment: {
+    codexCli: boolean;
+    codexVersion: string | null;
+    nodeVersion: string;
+    pnpmVersion: string | null;
+  };
+};

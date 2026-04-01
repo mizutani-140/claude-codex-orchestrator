@@ -48,8 +48,8 @@
     {
       "id": "p1-orch-health-split",
       "title": "Split orch-health into check (fast CI) and doctor (diagnostic)",
-      "status": "pending",
-      "passes": false,
+      "status": "done",
+      "passes": true,
       "acceptance": "pnpm run check is fast (<2s) and CI-safe. pnpm run doctor gives detailed diagnostics. init.sh uses check.",
       "depends_on": [
         "harness-foundation"

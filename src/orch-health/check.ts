@@ -1,4 +1,3 @@
-import { execSync } from "node:child_process";
 import { accessSync, constants, existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -182,24 +181,6 @@ export function runCheck(rootDir: string): CheckResult {
       });
     }
   }
-
-  try {
-    execSync("command -v codex", { cwd: rootDir, stdio: "pipe" });
-    items.push({
-      name: "codex-cli",
-      path: "codex",
-      status: "ok",
-      detail: "found",
-    });
-  } catch {
-    items.push({
-      name: "codex-cli",
-      path: "codex",
-      status: "warn",
-      detail: "not found on PATH",
-    });
-  }
-
   return {
     timestamp: new Date().toISOString(),
     items,

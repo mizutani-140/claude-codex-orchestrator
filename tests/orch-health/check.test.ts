@@ -88,22 +88,6 @@ function createValidFixture(rootDir: string): void {
   }
 }
 
-function withFakeCodex<T>(callback: () => T): T {
-  const binDir = mkdtempSync(join(tmpdir(), "orch-health-codex-"));
-  createdDirs.push(binDir);
-  const codexPath = join(binDir, "codex");
-  writeFileSync(codexPath, "#!/bin/sh\nexit 0\n");
-  chmodSync(codexPath, 0o755);
-
-  const originalPath = process.env.PATH ?? "";
-  process.env.PATH = `${binDir}:${originalPath}`;
-  try {
-    return callback();
-  } finally {
-    process.env.PATH = originalPath;
-  }
-}
-
 afterEach(() => {
   while (createdDirs.length > 0) {
     const dir = createdDirs.pop();
@@ -137,7 +121,7 @@ describe("runCheck", () => {
     writeFile(rootDir, ".claude/last-plan-critique.json", "{bad json\n");
     chmodSync(join(rootDir, "hooks/scripts/codex-plan-bridge.sh"), 0o644);
 
-    const result = withFakeCodex(() => runCheck(rootDir));
+    const result = runCheck(rootDir);
 
     expect(result.items).toContainEqual(
       expect.objectContaining({
@@ -175,7 +159,7 @@ description: missing tools
 `,
     );
 
-    const result = withFakeCodex(() => runCheck(rootDir));
+    const result = runCheck(rootDir);
 
     expect(result.items).toContainEqual(
       expect.objectContaining({
@@ -185,5 +169,14 @@ description: missing tools
         detail: expect.stringContaining("tools"),
       }),
     );
+  });
+
+  it("does not include codex-cli check items", () => {
+    const rootDir = createTempRoot();
+    createValidFixture(rootDir);
+
+    const result = runCheck(rootDir);
+
+    expect(result.items.filter((item) => item.name === "codex-cli")).toHaveLength(0);
   });
 });

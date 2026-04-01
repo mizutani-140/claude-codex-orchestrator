@@ -9,6 +9,7 @@
     "build": "tsc",
     "test": "vitest run",
     "check": "node dist/orch-health/cli.js check",
+    "doctor": "node dist/orch-health/cli.js doctor",
     "status": "node dist/orch-health/cli.js status"
   },
   "devDependencies": {
