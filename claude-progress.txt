@@ -1,3 +1,12 @@
+## Session: 2026-04-01 19:10
+### Completed
+- P1 promotion complete. All warns resolved (45ok/0warn/0fail). specs/p1-promotion.md tracked. Executable bits fixed. External review: P1 landed, promotion pending → done. Vitest 17/17 + hook tests all pass.
+### Next
+- P2 evidence plane: verify-run.sh, manifest.json, boundary-results.json, exit code/log/hash provenance.
+### Blockers
+- None
+---
+
 ## Session: 2026-04-01 18:37
 ### Completed
 - P1 promotion: structured boundary_tests_run + exact match, session-end state normalization, settings-sync.sh extraction, status.ts session-aware reads, complete .gitignore. External review: Strong P1 candidate (85-90%). Vitest 17/17, hook tests all pass.
