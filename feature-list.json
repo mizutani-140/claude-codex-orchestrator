@@ -63,8 +63,8 @@
     {
       "id": "p1-promotion",
       "title": "P1 promotion: close gaps identified in external review",
-      "status": "needs-review",
-      "passes": false,
+      "status": "done",
+      "passes": true,
       "acceptance": "1) pnpm test runs hook shell tests. 2) session-end.sh does not downgrade done features. 3) test-session-scripts.sh handles missing git identity. 4) boundary resolver blocks in eval gate (not advisory). 5) model-router defaults are correct (review/retry=gpt-5.4-mini). 6) settings migration strips broad Bash wildcards.",
       "depends_on": [
         "p1-bootstrap-cleanup"
