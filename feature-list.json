@@ -18,7 +18,7 @@
     {
       "id": "harness-hooks",
       "title": "Hook and script adjustments for test enforcement and git commits",
-      "status": "done",
+      "status": "needs-review",
       "passes": true,
       "acceptance": "codex-implement.sh enforces testing, guard-bash-policy.sh allows new scripts",
       "depends_on": [
