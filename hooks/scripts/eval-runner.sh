@@ -50,10 +50,22 @@ run_eval_dir() {
     return 0
   fi
 
+  # Determine timeout command (GNU coreutils or macOS gtimeout)
+  local timeout_cmd=""
+  if command -v timeout >/dev/null 2>&1; then
+    timeout_cmd="timeout 60"
+  elif command -v gtimeout >/dev/null 2>&1; then
+    timeout_cmd="gtimeout 60"
+  fi
+
   while IFS= read -r eval_script; do
     found=1
     if [[ -x "$eval_script" ]]; then
-      record_output "$eval_script" "$("$eval_script" 2>&1 || true)"
+      if [[ -n "$timeout_cmd" ]]; then
+        record_output "$eval_script" "$($timeout_cmd bash "$eval_script" 2>&1 || echo "{\"name\":\"$(basename "$eval_script" .sh)\",\"category\":\"unknown\",\"status\":\"FAIL\",\"detail\":\"eval timed out or failed\"}")"
+      else
+        record_output "$eval_script" "$("$eval_script" 2>&1 || true)"
+      fi
     else
       record_output "$eval_script" "not executable"
     fi
@@ -87,4 +99,9 @@ printf '%s\n' "$RESULT"
 # Best-effort artifact persistence
 if mkdir -p "$ARTIFACT_DIR" 2>/dev/null; then
   printf '%s\n' "$RESULT" > "$ARTIFACT_DIR/${FILE_TIMESTAMP}-$$.json" 2>/dev/null || true
+fi
+
+# Exit with failure if any eval failed
+if [[ "$FAIL_COUNT" -gt 0 ]]; then
+  exit 1
 fi

@@ -77,6 +77,33 @@ if [[ -d "$REG_DIR" ]]; then
   done < <(find "$REG_DIR" -maxdepth 1 -type f -name '*.sh' | sort)
 fi
 
+# Test: eval-runner.sh exits 1 when a FAIL eval exists
+TEMP_EVAL_DIR="$(mktemp -d)"
+TEMP_CAP_DIR="$TEMP_EVAL_DIR/evals/capability"
+TEMP_REG_DIR="$TEMP_EVAL_DIR/evals/regression"
+mkdir -p "$TEMP_CAP_DIR" "$TEMP_REG_DIR"
+cat > "$TEMP_CAP_DIR/always-fail.sh" <<'EVALEOF'
+#!/usr/bin/env bash
+echo '{"name":"always-fail","category":"test","status":"FAIL","detail":"intentional failure"}'
+EVALEOF
+chmod +x "$TEMP_CAP_DIR/always-fail.sh"
+
+FAIL_EXIT=0
+PROJECT_DIR="$TEMP_EVAL_DIR" bash "$RUNNER" >/dev/null 2>&1 || FAIL_EXIT=$?
+if [[ "$FAIL_EXIT" -ne 0 ]]; then
+  pass "eval-runner exits non-zero when FAIL eval exists"
+else
+  fail "eval-runner should exit non-zero when FAIL eval exists"
+fi
+rm -rf "$TEMP_EVAL_DIR"
+
+# Test: eval-runner.sh contains timeout detection logic
+if grep -q 'timeout_cmd\|gtimeout' "$RUNNER"; then
+  pass "eval-runner contains timeout detection logic"
+else
+  fail "eval-runner missing timeout detection logic"
+fi
+
 echo "Results: $PASS passed, $FAIL failed"
 
 if [[ "$FAIL" -gt 0 ]]; then
