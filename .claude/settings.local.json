@@ -53,7 +53,8 @@
       "Bash(bash tests/hooks/test-base-commit-fail-closed.sh)",
       "Bash(bash tests/hooks/test-retry-separation.sh)",
       "Bash(bash tests/hooks/test-session-scoped-state.sh)",
-      "Bash(bash tests/hooks/test-eval-gate-wiring.sh)"
+      "Bash(bash tests/hooks/test-eval-gate-wiring.sh)",
+      "Bash(bash tests/hooks/test-session-end-evidence.sh)"
     ]
   },
   "hooks": {

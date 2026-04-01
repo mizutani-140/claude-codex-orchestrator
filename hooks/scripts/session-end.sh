@@ -2,6 +2,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$SCRIPT_DIR/session-util.sh" ]]; then
+  source "$SCRIPT_DIR/session-util.sh"
+fi
 DEFAULT_PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 if [[ -f "$DEFAULT_PROJECT_DIR/package.json" ]] || [[ -d "$DEFAULT_PROJECT_DIR/.git" ]]; then
   PROJECT_DIR="$DEFAULT_PROJECT_DIR"
@@ -52,25 +55,94 @@ else
 fi
 
 if [[ -n "$FEATURE_ID" ]] && [[ -f feature-list.json ]] && command -v jq >/dev/null 2>&1; then
-  TARGET_STATUS="needs-review"
-  if [[ "$SESSION_RESULT" == "success" ]] && [[ -n "$TEST_EVIDENCE" ]]; then
-    TARGET_STATUS="done"
+  FINAL_STATUS="needs-review"
+
+  if [[ "$SESSION_RESULT" == "success" && -n "$TEST_EVIDENCE" ]]; then
+    EVAL_GATE_FILE=""
+    ARCH_REVIEW_FILE=""
+    SESSION_SCOPED_GATES=false
+
+    if declare -F session_file >/dev/null 2>&1; then
+      EVAL_GATE_FILE="$(session_file "eval-gate.json" 2>/dev/null || echo "")"
+      ARCH_REVIEW_FILE="$(session_file "architecture-review.json" 2>/dev/null || echo "")"
+      if declare -F get_session_id >/dev/null 2>&1 && [[ -n "$(get_session_id 2>/dev/null || echo "")" ]]; then
+        SESSION_SCOPED_GATES=true
+      fi
+    fi
+
+    EVAL_PASS=false
+    ARCH_PASS=false
+
+    if [[ -n "$EVAL_GATE_FILE" && -f "$EVAL_GATE_FILE" ]]; then
+      EVAL_STATUS="$(jq -r '.status // "UNKNOWN"' "$EVAL_GATE_FILE" 2>/dev/null || echo "UNKNOWN")"
+      if [[ "$EVAL_STATUS" == "PASS" ]]; then
+        EVAL_PASS=true
+      fi
+    else
+      if [[ "$SESSION_SCOPED_GATES" == "true" ]]; then
+        # Active session: do NOT fall back to legacy (cross-session contamination risk)
+        EVAL_PASS=false
+      else
+        # No session: check legacy location
+        LEGACY_EVAL="$PROJECT_DIR/.claude/last-eval-gate.json"
+        if [[ -f "$LEGACY_EVAL" ]]; then
+          EVAL_STATUS="$(jq -r '.status // "UNKNOWN"' "$LEGACY_EVAL" 2>/dev/null || echo "UNKNOWN")"
+          if [[ "$EVAL_STATUS" == "PASS" ]]; then
+            EVAL_PASS=true
+          fi
+        else
+          EVAL_PASS=true
+        fi
+      fi
+    fi
+
+    if [[ -n "$ARCH_REVIEW_FILE" && -f "$ARCH_REVIEW_FILE" ]]; then
+      ARCH_STATUS="$(jq -r '.status // "UNKNOWN"' "$ARCH_REVIEW_FILE" 2>/dev/null || echo "UNKNOWN")"
+      if [[ "$ARCH_STATUS" == "PASS" ]]; then
+        ARCH_PASS=true
+      fi
+    else
+      if [[ "$SESSION_SCOPED_GATES" == "true" ]]; then
+        ARCH_PASS=false
+      else
+        LEGACY_ARCH="$PROJECT_DIR/.claude/last-adversarial-review.json"
+        if [[ -f "$LEGACY_ARCH" ]]; then
+          ARCH_STATUS="$(jq -r '.status // "UNKNOWN"' "$LEGACY_ARCH" 2>/dev/null || echo "UNKNOWN")"
+          if [[ "$ARCH_STATUS" == "PASS" ]]; then
+            ARCH_PASS=true
+          fi
+        else
+          ARCH_PASS=true
+        fi
+      fi
+    fi
+
+    if [[ "$EVAL_PASS" == "true" && "$ARCH_PASS" == "true" ]]; then
+      FINAL_STATUS="done"
+    else
+      echo "WARNING: session_result=success but gates not all PASS (eval=$EVAL_PASS, arch=$ARCH_PASS). Setting needs-review." >&2
+      FINAL_STATUS="needs-review"
+    fi
+  elif [[ "$SESSION_RESULT" == "failed" ]]; then
+    FINAL_STATUS="blocked"
+  fi
+
+  if [[ "$FINAL_STATUS" == "done" ]]; then
     UPDATED="$(jq --arg id "$FEATURE_ID" '
       .features |= map(
         if .id == $id then .status = "done" | .passes = true else . end
       )
     ' feature-list.json)"
-  elif [[ "$SESSION_RESULT" == "failed" ]]; then
-    TARGET_STATUS="blocked"
-    UPDATED="$(jq --arg id "$FEATURE_ID" --arg status "$TARGET_STATUS" '
+  elif [[ "$FINAL_STATUS" == "blocked" ]]; then
+    UPDATED="$(jq --arg id "$FEATURE_ID" '
       .features |= map(
-        if .id == $id then .status = $status else . end
+        if .id == $id then .status = "blocked" else . end
       )
     ' feature-list.json)"
   else
-    UPDATED="$(jq --arg id "$FEATURE_ID" --arg status "$TARGET_STATUS" '
+    UPDATED="$(jq --arg id "$FEATURE_ID" '
       .features |= map(
-        if .id == $id then .status = $status else . end
+        if .id == $id then .status = "needs-review" else . end
       )
     ' feature-list.json)"
   fi
