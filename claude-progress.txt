@@ -1,3 +1,12 @@
+## Session: 2026-04-01 11:54
+### Completed
+- P1-1 session-artifact-migration complete. All .claude/last-* direct writes eliminated. 7 scripts migrated to session-util.sh write_session_and_legacy/read_session_or_legacy. New test test-no-legacy-direct-writes.sh added. Agent docs updated. P1/P2 roadmap (12 features) added to feature-list.json. Reasoning effort set to high.
+### Next
+- P1-2 boundary-test-resolver: Connect boundary-test-map.json to deterministic resolver.
+### Blockers
+- None
+---
+
 ## Session: 2026-04-01 10:49
 ### Completed
 - Verified and marked all 3 features as done: harness-foundation, harness-constraints, harness-hooks. All vitest (8/8) and hook tests (16 test files) pass. Fixed eval-gate and session-scoped-state test issues.

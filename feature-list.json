@@ -28,7 +28,7 @@
     {
       "id": "p1-session-artifact-migration",
       "title": "Migrate .claude/last-* to .claude/sessions/<id>/ scoped storage",
-      "status": "done",
+      "status": "needs-review",
       "passes": true,
       "acceptance": "All gate/review artifacts written to .claude/sessions/<id>/. Legacy .claude/last-* paths eliminated from write paths. session-util.sh is sole accessor. All existing tests pass.",
       "depends_on": [
