@@ -109,6 +109,16 @@
       "depends_on": [
         "p2-evals-framework"
       ]
+    },
+    {
+      "id": "p2-evidence-plane",
+      "title": "Evidence plane: verify-run.sh, manifest.json, non-forgeable execution evidence",
+      "status": "done",
+      "passes": true,
+      "acceptance": "verify-run.sh wraps test execution and records exit code/log/hash. manifest.json is source of truth for eval runs. eval-runner.sh uses manifest for artifact persistence. boundary-results.json records boundary test evidence from wrapper, not model.",
+      "depends_on": [
+        "p2-evals-framework"
+      ]
     }
   ]
 }
