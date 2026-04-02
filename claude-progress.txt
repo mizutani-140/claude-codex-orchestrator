@@ -1,3 +1,12 @@
+## Session: 2026-04-02 10:35
+### Completed
+- P2 evidence plane completed. Boundary provenance migrated from model-controlled (codex-implement.sh attestation) to wrapper-owned (manifest.json via verify-run.sh). codex-implement.sh attestation generation removed. codex-eval-gate.sh reads manifest first, falls back to model-report with explicit source tracking. All tests pass.
+### Next
+- External review for P2-2 promotion. Then p2-module-ablation or p2-harness-branching.
+### Blockers
+- None
+---
+
 ## Session: 2026-04-02 09:48
 ### Completed
 - P2 evidence plane complete. verify-run.sh wraps execution with exit_code/log/sha256. eval-runner.sh writes manifest.json to artifacts/runs/<run-id>/ with atomic rename. Artifact write failures now reported (not silent). 4 evals pass, 11 evidence plane tests pass.
