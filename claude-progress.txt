@@ -1,3 +1,12 @@
+## Session: 2026-04-02 12:30
+### Completed
+- P2 evidence plane hardening + review compiler + feature promotion split. evidence-plane-hardening: current-run binding, no model-report fallback, session validation. review-compiler: structured blocker issues from raw review. feature-promotion-split: record-session + promote-feature separated from session-end. All tests pass.
+### Next
+- p2-deferral-adjudicator, p2-resolution-ledger, p2-prose-only-retry-guard. Then p2-module-ablation and p2-harness-branching.
+### Blockers
+- None
+---
+
 ## Session: 2026-04-02 10:35
 ### Completed
 - P2 evidence plane completed. Boundary provenance migrated from model-controlled (codex-implement.sh attestation) to wrapper-owned (manifest.json via verify-run.sh). codex-implement.sh attestation generation removed. codex-eval-gate.sh reads manifest first, falls back to model-report with explicit source tracking. All tests pass.
