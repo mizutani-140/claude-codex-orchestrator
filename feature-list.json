@@ -119,6 +119,67 @@
       "depends_on": [
         "p2-evals-framework"
       ]
+    },
+    {
+      "id": "p2-evidence-plane-hardening",
+      "title": "Bind evidence to current run and remove model-report fallback",
+      "status": "done",
+      "passes": true,
+      "acceptance": "Current run_id recorded and available to gates. codex-eval-gate.sh reads only current-run manifest for boundary evidence. Missing/stale wrapper evidence fails closed (no model-report fallback). boundary-results.json produced by wrapper. Tests cover stale rejection and no-fallback.",
+      "depends_on": [
+        "p2-evidence-plane"
+      ]
+    },
+    {
+      "id": "p2-review-compiler",
+      "title": "Compile raw review text into structured blocker issues",
+      "status": "pending",
+      "passes": false,
+      "acceptance": "Review text converted to stable blocker IDs with severity/deferrable/acceptance/evidence. Worker consumes open-issues.json not raw prose.",
+      "depends_on": [
+        "p2-evidence-plane-hardening"
+      ]
+    },
+    {
+      "id": "p2-deferral-adjudicator",
+      "title": "Separate defer/phase/risk authority from worker execution",
+      "status": "pending",
+      "passes": false,
+      "acceptance": "Worker cannot directly set deferred/accepted-risk on blockers. Defer requests are structured JSON resolved by separate adjudication path.",
+      "depends_on": [
+        "p2-review-compiler"
+      ]
+    },
+    {
+      "id": "p2-resolution-ledger",
+      "title": "Per-blocker resolution ledger",
+      "status": "pending",
+      "passes": false,
+      "acceptance": "Every blocker ID has ledger entry. Fixed entries reference evidence artifacts. Deferred entries require adjudicator approval. Promotion fails if any unresolved.",
+      "depends_on": [
+        "p2-review-compiler",
+        "p2-evidence-plane-hardening"
+      ]
+    },
+    {
+      "id": "p2-prose-only-retry-guard",
+      "title": "Reject prose-only retries after blocking review",
+      "status": "pending",
+      "passes": false,
+      "acceptance": "After blocking review, next attempt must include code diff, new evidence, or approved defer. Summary-only retries fail.",
+      "depends_on": [
+        "p2-resolution-ledger"
+      ]
+    },
+    {
+      "id": "p2-feature-promotion-split",
+      "title": "Split promotion/state mutation from session recording",
+      "status": "pending",
+      "passes": false,
+      "acceptance": "session-end no longer owns all progress/feature/VCS duties. Promotion is evidence-driven. Recording possible even when promotion fails.",
+      "depends_on": [
+        "p2-evidence-plane-hardening"
+      ]
     }
   ]
 }

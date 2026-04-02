@@ -7,6 +7,7 @@
 .claude/last-sprint-contract.json
 .claude/last-boundary-attestation.json
 .claude/implementation.json
+.claude/current-run.json
 .claude/boundary-attestation.json
 .claude/session-base-commit
 .claude/sessions/

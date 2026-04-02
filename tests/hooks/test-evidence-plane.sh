@@ -55,7 +55,7 @@ else
 fi
 
 # Test 7: eval-runner produces manifest
-EVAL_OUTPUT="$(bash "$PROJECT_DIR/hooks/scripts/eval-runner.sh" 2>/dev/null)"
+EVAL_OUTPUT="$(bash "$PROJECT_DIR/hooks/scripts/eval-runner.sh" 2>/dev/null || true)"
 # Find latest run directory
 LATEST_RUN="$(ls -td "$PROJECT_DIR/artifacts/runs/"*/ 2>/dev/null | head -1)"
 if [[ -n "$LATEST_RUN" ]] && [[ -f "${LATEST_RUN}manifest.json" ]]; then
@@ -114,4 +114,26 @@ fi
 
 rm -rf "$TMPLOG"
 rm -rf "$TEMP_PROJECT"
+
+# Test 11: eval-runner writes current-run.json after manifest
+LATEST_RUN_DIR="$(ls -td "$PROJECT_DIR/artifacts/runs/"*/ 2>/dev/null | head -1)"
+LATEST_RUN_ID="$(basename "$LATEST_RUN_DIR" /)"
+CURRENT_RUN_FILE="$PROJECT_DIR/.claude/current-run.json"
+if [[ -f "$CURRENT_RUN_FILE" ]]; then
+  CR_RUN_ID="$(jq -r '.run_id' "$CURRENT_RUN_FILE")"
+  CR_MANIFEST="$(jq -r '.manifest_path' "$CURRENT_RUN_FILE")"
+  if [[ "$CR_RUN_ID" == "$LATEST_RUN_ID" ]] && [[ -f "$CR_MANIFEST" ]]; then
+    echo "PASS: eval-runner writes current-run.json with valid run_id and manifest_path"
+  else
+    echo "FAIL: current-run.json has wrong run_id ($CR_RUN_ID vs $LATEST_RUN_ID) or missing manifest"; exit 1
+  fi
+  if jq -e 'has("session_id")' "$CURRENT_RUN_FILE" >/dev/null 2>&1; then
+    echo "PASS: current-run.json includes session_id field"
+  else
+    echo "FAIL: current-run.json missing session_id field"; exit 1
+  fi
+else
+  echo "FAIL: eval-runner did not write current-run.json"; exit 1
+fi
+
 echo "=== All evidence plane tests passed ==="

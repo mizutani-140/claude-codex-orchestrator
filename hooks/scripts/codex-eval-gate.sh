@@ -118,51 +118,46 @@ if [[ -n "$CHANGED_FILES" ]]; then
     elif ! echo "$REQUIRED_BOUNDARY" | jq -e 'type == "array"' >/dev/null 2>&1; then
       FAILURES+=("boundary-test-resolver.sh returned invalid JSON: $REQUIRED_BOUNDARY")
     elif [[ "$REQUIRED_BOUNDARY" != "[]" ]]; then
-      # Try wrapper-owned evidence first (manifest from eval-runner)
-      BOUNDARY_RUN="[]"
-      BOUNDARY_SOURCE="none"
-
-      # Check for latest manifest with boundary evidence
-      # Only consider manifests from the current session (not stale)
-      LATEST_MANIFEST=""
-      SESSION_FILE="$PROJECT_DIR/.claude/current-session"
-      SESSION_START_TS=0
-      if [[ -f "$SESSION_FILE" ]]; then
-        SESSION_START_TS="$(stat -f %m "$SESSION_FILE" 2>/dev/null || stat -c %Y "$SESSION_FILE" 2>/dev/null || echo 0)"
-      fi
-      if [[ -d "$PROJECT_DIR/artifacts/runs" ]]; then
-        LATEST_MANIFEST="$(ls -t "$PROJECT_DIR"/artifacts/runs/*/manifest.json 2>/dev/null | head -1)"
-      fi
-      # Reject stale manifests (older than current session)
-      if [[ -n "$LATEST_MANIFEST" ]] && [[ -f "$LATEST_MANIFEST" ]]; then
-        MANIFEST_TS="$(stat -f %m "$LATEST_MANIFEST" 2>/dev/null || stat -c %Y "$LATEST_MANIFEST" 2>/dev/null || echo 0)"
-        if [[ "$SESSION_START_TS" -gt 0 ]] && [[ "$MANIFEST_TS" -lt "$SESSION_START_TS" ]]; then
-          LATEST_MANIFEST=""
+      # Read current-run pointer (set by eval-runner.sh)
+      CURRENT_RUN_FILE="$PROJECT_DIR/.claude/current-run.json"
+      if [[ ! -f "$CURRENT_RUN_FILE" ]]; then
+        FAILURES+=("No current-run evidence: .claude/current-run.json missing. Run eval-runner.sh first.")
+      else
+        RUN_MANIFEST="$(jq -r '.manifest_path // empty' "$CURRENT_RUN_FILE" 2>/dev/null || echo "")"
+        if [[ -z "$RUN_MANIFEST" ]] || [[ ! -f "$RUN_MANIFEST" ]]; then
+          FAILURES+=("Current-run manifest not found: ${RUN_MANIFEST:-<empty>}")
+        else
+          # Validate manifest is from current session (not stale)
+          RUN_ID="$(jq -r '.run_id // empty' "$CURRENT_RUN_FILE" 2>/dev/null || echo "")"
+          MANIFEST_RUN_ID="$(jq -r '.run_id // empty' "$RUN_MANIFEST" 2>/dev/null || echo "")"
+          if [[ "$RUN_ID" != "$MANIFEST_RUN_ID" ]]; then
+            FAILURES+=("Current-run pointer (${RUN_ID}) does not match manifest (${MANIFEST_RUN_ID})")
+          else
+            # Validate session_id matches current session (prevent cross-session contamination)
+            POINTER_SESSION="$(jq -r '.session_id // empty' "$CURRENT_RUN_FILE" 2>/dev/null || echo "")"
+            CURRENT_SESSION=""
+            if [[ -f "$PROJECT_DIR/.claude/current-session" ]]; then
+              CURRENT_SESSION="$(head -n 1 "$PROJECT_DIR/.claude/current-session" | tr -d '\r\n')"
+            fi
+            # Only reject if BOTH sides have a session_id and they differ
+            if [[ -n "$POINTER_SESSION" ]] && [[ -n "$CURRENT_SESSION" ]] && [[ "$POINTER_SESSION" != "$CURRENT_SESSION" ]]; then
+              FAILURES+=("Current-run session (${POINTER_SESSION}) does not match active session (${CURRENT_SESSION})")
+            else
+              # Extract boundary types from passing evals with exit_code 0
+              MANIFEST_BOUNDARY="$(jq '[.evals[] | select(.status == "PASS" and .evidence.exit_code == 0) | .name] | map(select(test("boundary|contract|integration|security|smoke")))' "$RUN_MANIFEST" 2>/dev/null || echo "[]")"
+              
+              MISSING_BOUNDARY=""
+              for bt in $(echo "$REQUIRED_BOUNDARY" | jq -r '.[]' 2>/dev/null); do
+                if ! echo "$MANIFEST_BOUNDARY" | jq -e --arg bt "$bt" 'any(.[]; . == $bt or (. | test($bt)))' >/dev/null 2>&1; then
+                  MISSING_BOUNDARY="$MISSING_BOUNDARY $bt"
+                fi
+              done
+              if [[ -n "${MISSING_BOUNDARY// }" ]]; then
+                FAILURES+=("Required boundary tests not run:$MISSING_BOUNDARY (source: manifest run $RUN_ID)")
+              fi
+            fi
+          fi
         fi
-      fi
-
-      if [[ -n "$LATEST_MANIFEST" ]] && [[ -f "$LATEST_MANIFEST" ]]; then
-        # Extract boundary test types from eval names where BOTH status is PASS
-        # AND exit_code is 0 (defense against FAIL-but-exit-0 evals)
-        MANIFEST_BOUNDARY="$(jq '[.evals[] | select(.status == "PASS" and .evidence.exit_code == 0) | .name] | map(select(test("boundary|contract|integration|security|smoke")))' "$LATEST_MANIFEST" 2>/dev/null || echo "[]")"
-        BOUNDARY_RUN="$MANIFEST_BOUNDARY"
-        BOUNDARY_SOURCE="manifest"
-      fi
-
-      # Fallback: model-reported boundary_tests_run (ONLY if no manifest exists at all)
-      if [[ "$BOUNDARY_SOURCE" == "none" ]]; then
-        BOUNDARY_RUN="$(echo "$IMPL" | jq '(.boundary_tests_run // [])' 2>/dev/null || echo "[]")"
-        BOUNDARY_SOURCE="model-report"
-      fi
-
-      MISSING_BOUNDARY=""
-      for bt in $(echo "$REQUIRED_BOUNDARY" | jq -r '.[]' 2>/dev/null); do
-        if ! echo "$BOUNDARY_RUN" | jq -e --arg bt "$bt" 'any(.[]; . == $bt or (. | test($bt)))' >/dev/null 2>&1; then
-          MISSING_BOUNDARY="$MISSING_BOUNDARY $bt"
-        fi
-      done
-      if [[ -n "${MISSING_BOUNDARY// }" ]]; then
-        FAILURES+=("Required boundary tests not run:$MISSING_BOUNDARY (source: $BOUNDARY_SOURCE)")
       fi
     fi
   fi

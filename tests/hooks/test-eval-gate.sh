@@ -88,7 +88,7 @@ else
   exit 1
 fi
 
-# Test 9: boundary tests required but not run -> FAIL
+# Test 9: boundary tests required but missing from current-run manifest -> FAIL
 TEST_DIR_BT="$TMPDIR_BASE/test-boundary-block"
 mkdir -p "$TEST_DIR_BT/.claude" "$TEST_DIR_BT/hooks/scripts"
 cd "$TEST_DIR_BT"
@@ -109,11 +109,14 @@ echo '["integration-test","api-contract-test"]'
 RESOLVER
 chmod +x "$TEST_DIR_BT/hooks/scripts/boundary-test-resolver.sh"
 echo '{"status":"DONE","tests_status":"PASS","test_log":"unit tests passed","changed_files":["src/api/routes.ts"],"tests_run":["unit-test"]}' > "$TEST_DIR_BT/.claude/last-implementation-result.json"
+mkdir -p "$TEST_DIR_BT/artifacts/runs/test-run-9"
+echo '{"run_id":"test-run-9","evals":[],"summary":{"pass":0,"fail":0}}' > "$TEST_DIR_BT/artifacts/runs/test-run-9/manifest.json"
+echo '{"run_id":"test-run-9","manifest_path":"'"$TEST_DIR_BT"'/artifacts/runs/test-run-9/manifest.json"}' > "$TEST_DIR_BT/.claude/current-run.json"
 OUTPUT_BT="$(CLAUDE_PROJECT_DIR="$TEST_DIR_BT" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
 if echo "$OUTPUT_BT" | grep -q 'boundary tests not run'; then
-  echo "PASS: boundary tests required but not run triggers FAIL"
+  echo "PASS: boundary tests missing from current-run manifest trigger FAIL"
 else
-  echo "FAIL: boundary tests not blocking (output: $OUTPUT_BT)"
+  echo "FAIL: boundary tests missing from current-run manifest should block (output: $OUTPUT_BT)"
   exit 1
 fi
 
@@ -157,7 +160,7 @@ else
   exit 1
 fi
 
-# Test 12: manifest evidence with matching types -> PASS
+# Test 12: current-run.json + valid manifest -> PASS
 TEST_DIR_BTR="$TMPDIR_BASE/test-btr-pass"
 mkdir -p "$TEST_DIR_BTR/.claude"
 cd "$TEST_DIR_BTR"
@@ -179,20 +182,21 @@ cat > "$REAL_RESOLVER" << 'RESOLVER'
 echo '["integration-test","api-contract-test"]'
 RESOLVER
 chmod +x "$REAL_RESOLVER"
-echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["some-cmd"],"boundary_tests_run":["integration-test","api-contract-test"]}' > "$TEST_DIR_BTR/.claude/last-implementation-result.json"
-mkdir -p "$TEST_DIR_BTR/artifacts/runs/run-001"
-echo '{"evals":[{"name":"integration-test","status":"PASS","evidence":{"exit_code":0}},{"name":"api-contract-test","status":"PASS","evidence":{"exit_code":0}}],"summary":{"pass":2,"fail":0}}' > "$TEST_DIR_BTR/artifacts/runs/run-001/manifest.json"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["some-cmd"]}' > "$TEST_DIR_BTR/.claude/last-implementation-result.json"
+mkdir -p "$TEST_DIR_BTR/artifacts/runs/test-run-12"
+echo '{"run_id":"test-run-12","evals":[{"name":"integration-test","status":"PASS","evidence":{"exit_code":0}},{"name":"api-contract-test","status":"PASS","evidence":{"exit_code":0}}],"summary":{"pass":2,"fail":0}}' > "$TEST_DIR_BTR/artifacts/runs/test-run-12/manifest.json"
+echo '{"run_id":"test-run-12","manifest_path":"'"$TEST_DIR_BTR"'/artifacts/runs/test-run-12/manifest.json"}' > "$TEST_DIR_BTR/.claude/current-run.json"
 OUTPUT_BTR="$(CLAUDE_PROJECT_DIR="$TEST_DIR_BTR" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
 mv "$REAL_RESOLVER_BAK_BTR" "$REAL_RESOLVER"
 BTR_STATUS="$(echo "$OUTPUT_BTR" | head -1 | jq -r '.status // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")"
 if [[ "$BTR_STATUS" == "PASS" ]]; then
-  echo "PASS: manifest evidence with matching types passes gate"
+  echo "PASS: current-run.json + valid manifest passes gate"
 else
-  echo "FAIL: manifest evidence with matching types should pass (output: $OUTPUT_BTR)"
+  echo "FAIL: current-run.json + valid manifest should pass (output: $OUTPUT_BTR)"
   exit 1
 fi
 
-# Test 13: boundary_tests_run empty when required -> FAIL
+# Test 13: no current-run.json + boundary required -> FAIL
 TEST_DIR_BTE="$TMPDIR_BASE/test-btr-empty"
 mkdir -p "$TEST_DIR_BTE/.claude"
 cd "$TEST_DIR_BTE"
@@ -214,17 +218,17 @@ cat > "$REAL_RESOLVER" << 'RESOLVER'
 echo '["integration-test"]'
 RESOLVER
 chmod +x "$REAL_RESOLVER"
-echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api.ts"],"tests_run":["pnpm test"],"boundary_tests_run":[]}' > "$TEST_DIR_BTE/.claude/last-implementation-result.json"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api.ts"],"tests_run":["pnpm test"],"boundary_tests_run":["integration-test"]}' > "$TEST_DIR_BTE/.claude/last-implementation-result.json"
 OUTPUT_BTE="$(CLAUDE_PROJECT_DIR="$TEST_DIR_BTE" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
 mv "$REAL_RESOLVER_BAK_BTE" "$REAL_RESOLVER"
-if echo "$OUTPUT_BTE" | grep -q 'boundary tests not run'; then
-  echo "PASS: empty boundary_tests_run with required types triggers FAIL"
+if echo "$OUTPUT_BTE" | grep -q 'No current-run evidence'; then
+  echo "PASS: no current-run.json + boundary required triggers FAIL"
 else
-  echo "FAIL: empty boundary_tests_run should trigger FAIL (output: $OUTPUT_BTE)"
+  echo "FAIL: missing current-run.json should trigger FAIL (output: $OUTPUT_BTE)"
   exit 1
 fi
 
-# Test 14: boundary_tests_run partial coverage -> FAIL for missing types
+# Test 14: current-run.json partial coverage -> FAIL for missing types
 TEST_DIR_BTP="$TMPDIR_BASE/test-btr-partial"
 mkdir -p "$TEST_DIR_BTP/.claude"
 cd "$TEST_DIR_BTP"
@@ -246,19 +250,20 @@ cat > "$REAL_RESOLVER" << 'RESOLVER'
 echo '["integration-test","api-contract-test","smoke-test"]'
 RESOLVER
 chmod +x "$REAL_RESOLVER"
-echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api.ts"],"tests_run":["pnpm test"],"boundary_tests_run":["integration-test"]}' > "$TEST_DIR_BTP/.claude/last-implementation-result.json"
-mkdir -p "$TEST_DIR_BTP/artifacts/runs/run-001"
-echo '{"evals":[{"name":"integration-test","status":"PASS","evidence":{"exit_code":0}}],"summary":{"pass":1,"fail":0}}' > "$TEST_DIR_BTP/artifacts/runs/run-001/manifest.json"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api.ts"],"tests_run":["pnpm test"]}' > "$TEST_DIR_BTP/.claude/last-implementation-result.json"
+mkdir -p "$TEST_DIR_BTP/artifacts/runs/test-run-14"
+echo '{"run_id":"test-run-14","evals":[{"name":"integration-test","status":"PASS","evidence":{"exit_code":0}}],"summary":{"pass":1,"fail":0}}' > "$TEST_DIR_BTP/artifacts/runs/test-run-14/manifest.json"
+echo '{"run_id":"test-run-14","manifest_path":"'"$TEST_DIR_BTP"'/artifacts/runs/test-run-14/manifest.json"}' > "$TEST_DIR_BTP/.claude/current-run.json"
 OUTPUT_BTP="$(CLAUDE_PROJECT_DIR="$TEST_DIR_BTP" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
 mv "$REAL_RESOLVER_BAK_BTP" "$REAL_RESOLVER"
 if echo "$OUTPUT_BTP" | grep -q 'api-contract-test' && echo "$OUTPUT_BTP" | grep -q 'smoke-test'; then
-  echo "PASS: partial manifest evidence reports missing types"
+  echo "PASS: current-run manifest partial coverage reports missing types"
 else
-  echo "FAIL: partial manifest evidence should report missing types (output: $OUTPUT_BTP)"
+  echo "FAIL: current-run manifest partial coverage should report missing types (output: $OUTPUT_BTP)"
   exit 1
 fi
 
-# Test 15: boundary_tests_run field missing (not present in JSON) -> FAIL when required
+# Test 15: no current-run.json + required boundary -> FAIL even if field missing
 TEST_DIR_BTM="$TMPDIR_BASE/test-btr-missing-field"
 mkdir -p "$TEST_DIR_BTM/.claude"
 cd "$TEST_DIR_BTM"
@@ -283,14 +288,14 @@ chmod +x "$REAL_RESOLVER"
 echo '{"status":"DONE","tests_status":"PASS","test_log":"security scan done","changed_files":["src/auth.ts"],"tests_run":["unit-test"]}' > "$TEST_DIR_BTM/.claude/last-implementation-result.json"
 OUTPUT_BTM="$(CLAUDE_PROJECT_DIR="$TEST_DIR_BTM" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
 mv "$REAL_RESOLVER_BAK_BTM" "$REAL_RESOLVER"
-if echo "$OUTPUT_BTM" | grep -q 'boundary tests not run'; then
-  echo "PASS: missing boundary_tests_run field triggers FAIL when required"
+if echo "$OUTPUT_BTM" | grep -q 'No current-run evidence'; then
+  echo "PASS: missing current-run.json fails even when boundary_tests_run field is absent"
 else
-  echo "FAIL: missing field should trigger FAIL (output: $OUTPUT_BTM)"
+  echo "FAIL: missing current-run.json should fail even when field is absent (output: $OUTPUT_BTM)"
   exit 1
 fi
 
-# Test 16: manifest evidence exact match passes even without matching tests_run commands
+# Test 16: current-run manifest exact match passes even without matching tests_run commands
 TEST_DIR_BTX="$TMPDIR_BASE/test-btr-exact"
 mkdir -p "$TEST_DIR_BTX/.claude"
 cd "$TEST_DIR_BTX"
@@ -312,16 +317,17 @@ cat > "$REAL_RESOLVER" << 'RESOLVER'
 echo '["integration-test","api-contract-test"]'
 RESOLVER
 chmod +x "$REAL_RESOLVER"
-echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["make test"],"boundary_tests_run":["integration-test","api-contract-test"]}' > "$TEST_DIR_BTX/.claude/last-implementation-result.json"
-mkdir -p "$TEST_DIR_BTX/artifacts/runs/run-001"
-echo '{"evals":[{"name":"integration-test","status":"PASS","evidence":{"exit_code":0}},{"name":"api-contract-test","status":"PASS","evidence":{"exit_code":0}}],"summary":{"pass":2,"fail":0}}' > "$TEST_DIR_BTX/artifacts/runs/run-001/manifest.json"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["make test"]}' > "$TEST_DIR_BTX/.claude/last-implementation-result.json"
+mkdir -p "$TEST_DIR_BTX/artifacts/runs/test-run-16"
+echo '{"run_id":"test-run-16","evals":[{"name":"integration-test","status":"PASS","evidence":{"exit_code":0}},{"name":"api-contract-test","status":"PASS","evidence":{"exit_code":0}}],"summary":{"pass":2,"fail":0}}' > "$TEST_DIR_BTX/artifacts/runs/test-run-16/manifest.json"
+echo '{"run_id":"test-run-16","manifest_path":"'"$TEST_DIR_BTX"'/artifacts/runs/test-run-16/manifest.json"}' > "$TEST_DIR_BTX/.claude/current-run.json"
 OUTPUT_BTX="$(CLAUDE_PROJECT_DIR="$TEST_DIR_BTX" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
 mv "$REAL_RESOLVER_BAK_BTX" "$REAL_RESOLVER"
 BTX_STATUS="$(echo "$OUTPUT_BTX" | head -1 | jq -r '.status // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")"
 if [[ "$BTX_STATUS" == "PASS" ]]; then
-  echo "PASS: manifest evidence exact match passes regardless of tests_run content"
+  echo "PASS: current-run manifest exact match passes regardless of tests_run content"
 else
-  echo "FAIL: should pass with manifest evidence exact match (output: $OUTPUT_BTX)"
+  echo "FAIL: should pass with current-run manifest exact match (output: $OUTPUT_BTX)"
   exit 1
 fi
 
@@ -350,14 +356,14 @@ chmod +x "$REAL_RESOLVER"
 echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":[],"tests_run":["pnpm test"],"boundary_tests_run":[]}' > "$TEST_DIR_BYPASS/.claude/last-implementation-result.json"
 OUTPUT_BYPASS="$(CLAUDE_PROJECT_DIR="$TEST_DIR_BYPASS" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
 mv "$REAL_RESOLVER_BAK_BYPASS" "$REAL_RESOLVER"
-if echo "$OUTPUT_BYPASS" | grep -q 'boundary tests not run'; then
-  echo "PASS: changed_files:[] bypass blocked by git diff"
+if echo "$OUTPUT_BYPASS" | grep -q 'No current-run evidence'; then
+  echo "PASS: changed_files:[] bypass blocked by current-run requirement"
 else
-  echo "FAIL: changed_files:[] should not bypass when git shows changes (output: $OUTPUT_BYPASS)"
+  echo "FAIL: changed_files:[] should not bypass when current-run evidence is missing (output: $OUTPUT_BYPASS)"
   exit 1
 fi
 
-# Test 18: manifest evidence used instead of model self-report
+# Test 18: current-run manifest evidence satisfies boundary gate
 TEST_DIR_ATTEST="$TMPDIR_BASE/test-attestation"
 mkdir -p "$TEST_DIR_ATTEST/.claude"
 cd "$TEST_DIR_ATTEST"
@@ -379,16 +385,17 @@ cat > "$REAL_RESOLVER" << 'RESOLVER'
 echo '["integration-test"]'
 RESOLVER
 chmod +x "$REAL_RESOLVER"
-echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["pnpm test"],"boundary_tests_run":["integration-test"]}' > "$TEST_DIR_ATTEST/.claude/last-implementation-result.json"
-mkdir -p "$TEST_DIR_ATTEST/artifacts/runs/run-001"
-echo '{"evals":[{"name":"integration-test","status":"PASS","evidence":{"exit_code":0}}],"summary":{"pass":1,"fail":0}}' > "$TEST_DIR_ATTEST/artifacts/runs/run-001/manifest.json"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["pnpm test"]}' > "$TEST_DIR_ATTEST/.claude/last-implementation-result.json"
+mkdir -p "$TEST_DIR_ATTEST/artifacts/runs/test-run-18"
+echo '{"run_id":"test-run-18","evals":[{"name":"integration-test","status":"PASS","evidence":{"exit_code":0}}],"summary":{"pass":1,"fail":0}}' > "$TEST_DIR_ATTEST/artifacts/runs/test-run-18/manifest.json"
+echo '{"run_id":"test-run-18","manifest_path":"'"$TEST_DIR_ATTEST"'/artifacts/runs/test-run-18/manifest.json"}' > "$TEST_DIR_ATTEST/.claude/current-run.json"
 OUTPUT_ATTEST="$(CLAUDE_PROJECT_DIR="$TEST_DIR_ATTEST" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
 mv "$REAL_RESOLVER_BAK_ATTEST" "$REAL_RESOLVER"
 ATTEST_STATUS="$(echo "$OUTPUT_ATTEST" | head -1 | jq -r '.status // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")"
 if [[ "$ATTEST_STATUS" == "PASS" ]]; then
-  echo "PASS: manifest evidence satisfies boundary gate"
+  echo "PASS: current-run manifest evidence satisfies boundary gate"
 else
-  echo "FAIL: manifest evidence should satisfy gate (output: $OUTPUT_ATTEST)"
+  echo "FAIL: current-run manifest evidence should satisfy gate (output: $OUTPUT_ATTEST)"
   exit 1
 fi
 
@@ -428,10 +435,10 @@ else
   exit 1
 fi
 
-# Test 20: model-report fallback when no manifest exists
-TEST_DIR_FALLBACK="$TMPDIR_BASE/test-model-fallback"
-mkdir -p "$TEST_DIR_FALLBACK/.claude"
-cd "$TEST_DIR_FALLBACK"
+# Test 20: no current-run.json + boundary required -> FAIL
+TEST_DIR_NOCR="$TMPDIR_BASE/test-no-current-run"
+mkdir -p "$TEST_DIR_NOCR/.claude"
+cd "$TEST_DIR_NOCR"
 git init -q
 git config user.name "Test"
 git config user.email "test@test.com"
@@ -443,25 +450,24 @@ echo "baseline" > src/api/routes.ts
 git add src/api/routes.ts
 git commit -m "add routes" -q
 echo "change" > src/api/routes.ts
-REAL_RESOLVER_BAK_FB="$TMPDIR_BASE/boundary-test-resolver.sh.fb.bak"
-cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_FB"
+REAL_RESOLVER_BAK_NOCR="$TMPDIR_BASE/boundary-test-resolver.sh.nocr.bak"
+cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_NOCR"
 cat > "$REAL_RESOLVER" << 'RESOLVER'
 #!/usr/bin/env bash
 echo '["integration-test"]'
 RESOLVER
 chmod +x "$REAL_RESOLVER"
-echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["pnpm test"],"boundary_tests_run":["integration-test"]}' > "$TEST_DIR_FALLBACK/.claude/last-implementation-result.json"
-OUTPUT_FB="$(CLAUDE_PROJECT_DIR="$TEST_DIR_FALLBACK" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
-mv "$REAL_RESOLVER_BAK_FB" "$REAL_RESOLVER"
-FB_STATUS="$(echo "$OUTPUT_FB" | head -1 | jq -r '.status // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")"
-if [[ "$FB_STATUS" == "PASS" ]]; then
-  echo "PASS: model-report fallback works when no manifest exists"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["pnpm test"],"boundary_tests_run":["integration-test"]}' > "$TEST_DIR_NOCR/.claude/last-implementation-result.json"
+OUTPUT_NOCR="$(CLAUDE_PROJECT_DIR="$TEST_DIR_NOCR" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
+mv "$REAL_RESOLVER_BAK_NOCR" "$REAL_RESOLVER"
+if echo "$OUTPUT_NOCR" | grep -q 'No current-run evidence'; then
+  echo "PASS: no current-run.json + boundary required triggers FAIL"
 else
-  echo "FAIL: model-report fallback should pass (output: $OUTPUT_FB)"
+  echo "FAIL: should fail when current-run.json is missing (output: $OUTPUT_NOCR)"
   exit 1
 fi
 
-# Test 21: stale manifest from previous session is ignored
+# Test 21: stale current-run.json (run_id mismatch) -> FAIL
 TEST_DIR_STALE="$TMPDIR_BASE/test-stale-manifest"
 mkdir -p "$TEST_DIR_STALE/.claude" "$TEST_DIR_STALE/artifacts/runs/run-old"
 cd "$TEST_DIR_STALE"
@@ -483,18 +489,51 @@ cat > "$REAL_RESOLVER" << 'RESOLVER'
 echo '["integration-test"]'
 RESOLVER
 chmod +x "$REAL_RESOLVER"
-echo '{"evals":[{"name":"integration-test","status":"PASS","evidence":{"exit_code":0}}],"summary":{"pass":1,"fail":0}}' > "$TEST_DIR_STALE/artifacts/runs/run-old/manifest.json"
-touch -t 202501010000 "$TEST_DIR_STALE/artifacts/runs/run-old/manifest.json"
-sleep 1
-echo "test-session-stale" > "$TEST_DIR_STALE/.claude/current-session"
-mkdir -p "$TEST_DIR_STALE/.claude/sessions/test-session-stale"
-echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["pnpm test"],"boundary_tests_run":[]}' > "$TEST_DIR_STALE/.claude/sessions/test-session-stale/implementation.json"
+echo '{"run_id":"run-old","evals":[{"name":"integration-test","status":"PASS","evidence":{"exit_code":0}}],"summary":{"pass":1,"fail":0}}' > "$TEST_DIR_STALE/artifacts/runs/run-old/manifest.json"
+echo '{"run_id":"run-new","manifest_path":"'"$TEST_DIR_STALE"'/artifacts/runs/run-old/manifest.json"}' > "$TEST_DIR_STALE/.claude/current-run.json"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["pnpm test"]}' > "$TEST_DIR_STALE/.claude/last-implementation-result.json"
 OUTPUT_STALE="$(CLAUDE_PROJECT_DIR="$TEST_DIR_STALE" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
 mv "$REAL_RESOLVER_BAK_STALE" "$REAL_RESOLVER"
-if echo "$OUTPUT_STALE" | grep -q 'boundary tests not run'; then
-  echo "PASS: stale manifest from previous session is ignored"
+if echo "$OUTPUT_STALE" | grep -q 'does not match'; then
+  echo "PASS: stale current-run.json with run_id mismatch triggers FAIL"
 else
-  echo "FAIL: stale manifest should be ignored (output: $OUTPUT_STALE)"
+  echo "FAIL: should fail on current-run/manifest run_id mismatch (output: $OUTPUT_STALE)"
+  exit 1
+fi
+
+# Test 21b: current-run.json session_id mismatch -> FAIL
+TEST_DIR_SESS="$TMPDIR_BASE/test-session-mismatch"
+mkdir -p "$TEST_DIR_SESS/.claude" "$TEST_DIR_SESS/artifacts/runs/run-sess"
+cd "$TEST_DIR_SESS"
+git init -q
+git config user.name "Test"
+git config user.email "test@test.com"
+touch initial.txt
+git add initial.txt
+git commit -m "init" -q
+mkdir -p src/api
+echo "baseline" > src/api/routes.ts
+git add src/api/routes.ts
+git commit -m "add routes" -q
+echo "change" > src/api/routes.ts
+REAL_RESOLVER_BAK_SESS="$TMPDIR_BASE/boundary-test-resolver.sh.sess.bak"
+cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_SESS"
+cat > "$REAL_RESOLVER" << 'RESOLVER'
+#!/usr/bin/env bash
+echo '["integration-test"]'
+RESOLVER
+chmod +x "$REAL_RESOLVER"
+echo '{"run_id":"run-sess","evals":[{"name":"integration-test","status":"PASS","evidence":{"exit_code":0}}],"summary":{"pass":1,"fail":0}}' > "$TEST_DIR_SESS/artifacts/runs/run-sess/manifest.json"
+echo '{"run_id":"run-sess","manifest_path":"'"$TEST_DIR_SESS"'/artifacts/runs/run-sess/manifest.json","session_id":"old-session"}' > "$TEST_DIR_SESS/.claude/current-run.json"
+echo "current-session-id" > "$TEST_DIR_SESS/.claude/current-session"
+mkdir -p "$TEST_DIR_SESS/.claude/sessions/current-session-id"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["pnpm test"]}' > "$TEST_DIR_SESS/.claude/sessions/current-session-id/implementation.json"
+OUTPUT_SESS="$(CLAUDE_PROJECT_DIR="$TEST_DIR_SESS" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
+mv "$REAL_RESOLVER_BAK_SESS" "$REAL_RESOLVER"
+if echo "$OUTPUT_SESS" | grep -q 'does not match active session'; then
+  echo "PASS: session_id mismatch in current-run.json triggers FAIL"
+else
+  echo "FAIL: session_id mismatch should trigger FAIL (output: $OUTPUT_SESS)"
   exit 1
 fi
 
@@ -520,8 +559,9 @@ cat > "$REAL_RESOLVER" << 'RESOLVER'
 echo '["integration-test"]'
 RESOLVER
 chmod +x "$REAL_RESOLVER"
-echo '{"evals":[{"name":"integration-test","status":"FAIL","evidence":{"exit_code":0}}],"summary":{"pass":0,"fail":1}}' > "$TEST_DIR_FAIL0/artifacts/runs/run-f0/manifest.json"
-echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["pnpm test"],"boundary_tests_run":["integration-test"]}' > "$TEST_DIR_FAIL0/.claude/last-implementation-result.json"
+echo '{"run_id":"test-run-22","evals":[{"name":"integration-test","status":"FAIL","evidence":{"exit_code":0}}],"summary":{"pass":0,"fail":1}}' > "$TEST_DIR_FAIL0/artifacts/runs/run-f0/manifest.json"
+echo '{"run_id":"test-run-22","manifest_path":"'"$TEST_DIR_FAIL0"'/artifacts/runs/run-f0/manifest.json"}' > "$TEST_DIR_FAIL0/.claude/current-run.json"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["pnpm test"]}' > "$TEST_DIR_FAIL0/.claude/last-implementation-result.json"
 OUTPUT_F0="$(CLAUDE_PROJECT_DIR="$TEST_DIR_FAIL0" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
 mv "$REAL_RESOLVER_BAK_F0" "$REAL_RESOLVER"
 if echo "$OUTPUT_F0" | grep -q 'boundary tests not run'; then
@@ -553,14 +593,15 @@ cat > "$REAL_RESOLVER" << 'RESOLVER'
 echo '["integration-test"]'
 RESOLVER
 chmod +x "$REAL_RESOLVER"
-echo '{"evals":[{"name":"lint-check","status":"PASS","evidence":{"exit_code":0}}],"summary":{"pass":1,"fail":0}}' > "$TEST_DIR_NOFB/artifacts/runs/run-nofb/manifest.json"
-echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["pnpm test"],"boundary_tests_run":["integration-test"]}' > "$TEST_DIR_NOFB/.claude/last-implementation-result.json"
+echo '{"run_id":"test-run-23","evals":[{"name":"lint-check","status":"PASS","evidence":{"exit_code":0}}],"summary":{"pass":1,"fail":0}}' > "$TEST_DIR_NOFB/artifacts/runs/run-nofb/manifest.json"
+echo '{"run_id":"test-run-23","manifest_path":"'"$TEST_DIR_NOFB"'/artifacts/runs/run-nofb/manifest.json"}' > "$TEST_DIR_NOFB/.claude/current-run.json"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["pnpm test"]}' > "$TEST_DIR_NOFB/.claude/last-implementation-result.json"
 OUTPUT_NOFB="$(CLAUDE_PROJECT_DIR="$TEST_DIR_NOFB" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
 mv "$REAL_RESOLVER_BAK_NOFB" "$REAL_RESOLVER"
-if echo "$OUTPUT_NOFB" | grep -q 'boundary tests not run' && echo "$OUTPUT_NOFB" | grep -q 'source: manifest'; then
-  echo "PASS: manifest present but no boundary match -> fail closed (no model-report fallback)"
+if echo "$OUTPUT_NOFB" | grep -q 'boundary tests not run' && echo "$OUTPUT_NOFB" | grep -q 'source: manifest run test-run-23'; then
+  echo "PASS: current-run manifest present but no boundary match -> fail closed"
 else
-  echo "FAIL: should fail closed when manifest exists but has no boundary matches (output: $OUTPUT_NOFB)"
+  echo "FAIL: should fail closed when current-run manifest has no boundary matches (output: $OUTPUT_NOFB)"
   exit 1
 fi
 

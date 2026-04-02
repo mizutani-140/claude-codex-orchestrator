@@ -196,6 +196,24 @@ if ! mv "$MANIFEST_TMP" "$MANIFEST_PATH"; then
   exit 2
 fi
 
+# Write current-run pointer for eval gate (session-scoped)
+CURRENT_RUN_FILE="$PROJECT_DIR/.claude/current-run.json"
+mkdir -p "$PROJECT_DIR/.claude"
+# Include session_id for cross-session validation
+CURRENT_SESSION_ID=""
+if [[ -f "$PROJECT_DIR/.claude/current-session" ]]; then
+  CURRENT_SESSION_ID="$(head -n 1 "$PROJECT_DIR/.claude/current-session" | tr -d '\r\n')"
+fi
+RUN_POINTER="$(jq -cn \
+  --arg run_id "$RUN_ID" \
+  --arg manifest_path "$MANIFEST_PATH" \
+  --arg session_id "$CURRENT_SESSION_ID" \
+  '{run_id: $run_id, manifest_path: $manifest_path, session_id: $session_id}')"
+printf '%s\n' "$RUN_POINTER" > "${CURRENT_RUN_FILE}.tmp.$$" && mv "${CURRENT_RUN_FILE}.tmp.$$" "$CURRENT_RUN_FILE" || {
+  echo "ERROR: failed to write current-run.json" >&2
+  exit 2
+}
+
 # Exit with failure if any eval failed
 if [[ "$FAIL_COUNT" -gt 0 ]]; then
   exit 1
