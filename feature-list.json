@@ -133,8 +133,8 @@
     {
       "id": "p2-review-compiler",
       "title": "Compile raw review text into structured blocker issues",
-      "status": "pending",
-      "passes": false,
+      "status": "done",
+      "passes": true,
       "acceptance": "Review text converted to stable blocker IDs with severity/deferrable/acceptance/evidence. Worker consumes open-issues.json not raw prose.",
       "depends_on": [
         "p2-evidence-plane-hardening"
