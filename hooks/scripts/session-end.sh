@@ -36,120 +36,18 @@ if [[ -z "$COMPLETED" ]]; then
   exit 1
 fi
 
-TIMESTAMP="$(date '+%Y-%m-%d %H:%M')"
+# 1. Record progress (always succeeds if COMPLETED is non-empty)
+bash "$(dirname "${BASH_SOURCE[0]}")/record-session.sh" "$COMPLETED" "$NEXT" "$BLOCKERS"
 
-NEW_ENTRY="## Session: $TIMESTAMP
-### Completed
-- $COMPLETED
-### Next
-- $NEXT
-### Blockers
-- $BLOCKERS
----
-"
-
-if [[ -f claude-progress.txt ]]; then
-  EXISTING="$(cat claude-progress.txt)"
-  printf '%s\n%s\n' "$NEW_ENTRY" "$EXISTING" > claude-progress.txt
-else
-  printf '%s\n' "$NEW_ENTRY" > claude-progress.txt
-fi
-
-if [[ -n "$FEATURE_ID" ]] && [[ -f feature-list.json ]] && command -v jq >/dev/null 2>&1; then
-  ALREADY_COMPLETE="$(jq --arg id "$FEATURE_ID" '[.features[] | select(.id == $id and (.passes == true or .status == "done"))] | length' feature-list.json 2>/dev/null || echo "0")"
-  if [[ "$ALREADY_COMPLETE" -gt 0 ]]; then
-    UPDATED="$(jq --arg id "$FEATURE_ID" '
-      .features |= map(
-        if .id == $id and (.passes == true or .status == "done") then
-          .status = "done" | .passes = true
-        else . end
-      )
-    ' feature-list.json)"
-    printf '%s\n' "$UPDATED" > feature-list.json
-  else
-    FINAL_STATUS="needs-review"
-
-    if [[ "$SESSION_RESULT" == "success" && -n "$TEST_EVIDENCE" ]]; then
-      SESSION_ID_SNAPSHOT=""
-      CURRENT_SESSION_FILE="$PROJECT_DIR/.claude/current-session"
-      if [[ -f "$CURRENT_SESSION_FILE" ]]; then
-        SESSION_ID_SNAPSHOT="$(head -1 "$CURRENT_SESSION_FILE" 2>/dev/null | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' || echo "")"
-      fi
-
-      EVAL_PASS=false
-      ARCH_PASS=false
-
-      if [[ -n "$SESSION_ID_SNAPSHOT" ]]; then
-        SESSION_DIR="$PROJECT_DIR/.claude/sessions/$SESSION_ID_SNAPSHOT"
-
-        EVAL_GATE_FILE="$SESSION_DIR/eval-gate.json"
-        if [[ -f "$EVAL_GATE_FILE" ]]; then
-          EVAL_STATUS="$(jq -r '.status // "UNKNOWN"' "$EVAL_GATE_FILE" 2>/dev/null || echo "UNKNOWN")"
-          if [[ "$EVAL_STATUS" == "PASS" ]]; then
-            EVAL_PASS=true
-          fi
-        fi
-
-        ARCH_REVIEW_FILE="$SESSION_DIR/architecture-review.json"
-        if [[ -f "$ARCH_REVIEW_FILE" ]]; then
-          ARCH_STATUS="$(jq -r '.status // "UNKNOWN"' "$ARCH_REVIEW_FILE" 2>/dev/null || echo "UNKNOWN")"
-          if [[ "$ARCH_STATUS" == "PASS" ]]; then
-            ARCH_PASS=true
-          fi
-        fi
-      else
-        LEGACY_EVAL_CONTENT="$(read_session_or_legacy "eval-gate.json" 2>/dev/null || echo "")"
-        if [[ -n "$LEGACY_EVAL_CONTENT" ]]; then
-          EVAL_STATUS="$(echo "$LEGACY_EVAL_CONTENT" | jq -r '.status // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")"
-          if [[ "$EVAL_STATUS" == "PASS" ]]; then
-            EVAL_PASS=true
-          fi
-        else
-          EVAL_PASS=true
-        fi
-
-        LEGACY_ARCH_CONTENT="$(read_session_or_legacy "architecture-review.json" 2>/dev/null || echo "")"
-        if [[ -n "$LEGACY_ARCH_CONTENT" ]]; then
-          ARCH_STATUS="$(echo "$LEGACY_ARCH_CONTENT" | jq -r '.status // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")"
-          if [[ "$ARCH_STATUS" == "PASS" ]]; then
-            ARCH_PASS=true
-          fi
-        else
-          ARCH_PASS=true
-        fi
-      fi
-
-      if [[ "$EVAL_PASS" == "true" && "$ARCH_PASS" == "true" ]]; then
-        FINAL_STATUS="done"
-      else
-        echo "WARNING: session_result=success but gates not all PASS (eval=$EVAL_PASS, arch=$ARCH_PASS). Setting needs-review." >&2
-        FINAL_STATUS="needs-review"
-      fi
-    elif [[ "$SESSION_RESULT" == "failed" ]]; then
-      FINAL_STATUS="blocked"
-    fi
-
-    if [[ "$FINAL_STATUS" == "done" ]]; then
-      UPDATED="$(jq --arg id "$FEATURE_ID" '
-        .features |= map(
-          if .id == $id then .status = "done" | .passes = true else . end
-        )
-      ' feature-list.json)"
-    elif [[ "$FINAL_STATUS" == "blocked" ]]; then
-      UPDATED="$(jq --arg id "$FEATURE_ID" '
-        .features |= map(
-          if .id == $id then .status = "blocked" else . end
-        )
-      ' feature-list.json)"
-    else
-      UPDATED="$(jq --arg id "$FEATURE_ID" '
-        .features |= map(
-          if .id == $id then .status = "needs-review" else . end
-        )
-      ' feature-list.json)"
-    fi
-
-    printf '%s\n' "$UPDATED" > feature-list.json
+# 2. Promote feature (can fail independently)
+if [[ -n "$FEATURE_ID" ]]; then
+  PROMOTE_RC=0
+  bash "$(dirname "${BASH_SOURCE[0]}")/promote-feature.sh" "$FEATURE_ID" "$SESSION_RESULT" "$TEST_EVIDENCE" || PROMOTE_RC=$?
+  if [[ "$PROMOTE_RC" -eq 2 ]]; then
+    echo "WARNING: feature promotion resulted in needs-review (gates not all PASS)" >&2
+  elif [[ "$PROMOTE_RC" -ne 0 ]]; then
+    echo "ERROR: feature promotion failed with exit code $PROMOTE_RC" >&2
+    exit 1
   fi
 fi
 

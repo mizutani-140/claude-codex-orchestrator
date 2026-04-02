@@ -174,8 +174,8 @@
     {
       "id": "p2-feature-promotion-split",
       "title": "Split promotion/state mutation from session recording",
-      "status": "pending",
-      "passes": false,
+      "status": "done",
+      "passes": true,
       "acceptance": "session-end no longer owns all progress/feature/VCS duties. Promotion is evidence-driven. Recording possible even when promotion fails.",
       "depends_on": [
         "p2-evidence-plane-hardening"
