@@ -164,8 +164,8 @@
     {
       "id": "p2-prose-only-retry-guard",
       "title": "Reject prose-only retries after blocking review",
-      "status": "pending",
-      "passes": false,
+      "status": "done",
+      "passes": true,
       "acceptance": "After blocking review, next attempt must include code diff, new evidence, or approved defer. Summary-only retries fail.",
       "depends_on": [
         "p2-resolution-ledger"
