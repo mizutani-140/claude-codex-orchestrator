@@ -680,4 +680,74 @@ else
   exit 1
 fi
 
+# Test 26: boundary_results_path outside run directory -> FAIL
+TEST_DIR_OUTSIDE="$TMPDIR_BASE/test-outside-rundir"
+mkdir -p "$TEST_DIR_OUTSIDE/.claude" "$TEST_DIR_OUTSIDE/artifacts/runs/run-outside" "$TEST_DIR_OUTSIDE/other"
+cd "$TEST_DIR_OUTSIDE"
+git init -q
+git config user.name "Test"
+git config user.email "test@test.com"
+touch initial.txt
+git add initial.txt
+git commit -m "init" -q
+mkdir -p src/api
+echo "baseline" > src/api/routes.ts
+git add src/api/routes.ts
+git commit -m "add routes" -q
+echo "change" > src/api/routes.ts
+REAL_RESOLVER_BAK_OUTSIDE="$TMPDIR_BASE/boundary-test-resolver.sh.outside.bak"
+cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_OUTSIDE"
+cat > "$REAL_RESOLVER" << 'RESOLVER'
+#!/usr/bin/env bash
+echo '["integration-test"]'
+RESOLVER
+chmod +x "$REAL_RESOLVER"
+echo '{"run_id":"run-outside","evals":[],"summary":{"pass":0,"fail":0}}' > "$TEST_DIR_OUTSIDE/artifacts/runs/run-outside/manifest.json"
+echo '{"run_id":"run-outside","boundary_tests":[{"type":"integration-test","status":"PASS","exit_code":0,"log_sha256":"xyz"}]}' > "$TEST_DIR_OUTSIDE/other/boundary-results.json"
+echo '{"run_id":"run-outside","manifest_path":"'"$TEST_DIR_OUTSIDE"'/artifacts/runs/run-outside/manifest.json","boundary_results_path":"'"$TEST_DIR_OUTSIDE"'/other/boundary-results.json"}' > "$TEST_DIR_OUTSIDE/.claude/current-run.json"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["pnpm test"]}' > "$TEST_DIR_OUTSIDE/.claude/last-implementation-result.json"
+OUTPUT_OUTSIDE="$(CLAUDE_PROJECT_DIR="$TEST_DIR_OUTSIDE" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
+mv "$REAL_RESOLVER_BAK_OUTSIDE" "$REAL_RESOLVER"
+if echo "$OUTPUT_OUTSIDE" | grep -q 'outside run directory'; then
+  echo "PASS: boundary_results_path outside run directory triggers FAIL"
+else
+  echo "FAIL: boundary_results_path outside run directory should trigger FAIL (output: $OUTPUT_OUTSIDE)"
+  exit 1
+fi
+
+# Test 27: boundary_results_path with path traversal (..) -> FAIL
+TEST_DIR_TRAV="$TMPDIR_BASE/test-traversal"
+mkdir -p "$TEST_DIR_TRAV/.claude" "$TEST_DIR_TRAV/artifacts/runs/run-trav" "$TEST_DIR_TRAV/artifacts/runs/evil"
+cd "$TEST_DIR_TRAV"
+git init -q
+git config user.name "Test"
+git config user.email "test@test.com"
+touch initial.txt
+git add initial.txt
+git commit -m "init" -q
+mkdir -p src/api
+echo "baseline" > src/api/routes.ts
+git add src/api/routes.ts
+git commit -m "add routes" -q
+echo "change" > src/api/routes.ts
+REAL_RESOLVER_BAK_TRAV="$TMPDIR_BASE/boundary-test-resolver.sh.trav.bak"
+cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_TRAV"
+cat > "$REAL_RESOLVER" << 'RESOLVER'
+#!/usr/bin/env bash
+echo '["integration-test"]'
+RESOLVER
+chmod +x "$REAL_RESOLVER"
+echo '{"run_id":"run-trav","evals":[],"summary":{"pass":0,"fail":0}}' > "$TEST_DIR_TRAV/artifacts/runs/run-trav/manifest.json"
+echo '{"run_id":"run-trav","boundary_tests":[{"type":"integration-test","status":"PASS","exit_code":0,"log_sha256":"xyz"}]}' > "$TEST_DIR_TRAV/artifacts/runs/evil/boundary-results.json"
+echo '{"run_id":"run-trav","manifest_path":"'"$TEST_DIR_TRAV"'/artifacts/runs/run-trav/manifest.json","boundary_results_path":"'"$TEST_DIR_TRAV"'/artifacts/runs/run-trav/../evil/boundary-results.json"}' > "$TEST_DIR_TRAV/.claude/current-run.json"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["pnpm test"]}' > "$TEST_DIR_TRAV/.claude/last-implementation-result.json"
+OUTPUT_TRAV="$(CLAUDE_PROJECT_DIR="$TEST_DIR_TRAV" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
+mv "$REAL_RESOLVER_BAK_TRAV" "$REAL_RESOLVER"
+if echo "$OUTPUT_TRAV" | grep -q 'outside run directory'; then
+  echo "PASS: boundary_results_path with path traversal (..) triggers FAIL"
+else
+  echo "FAIL: boundary_results_path with path traversal should trigger FAIL (output: $OUTPUT_TRAV)"
+  exit 1
+fi
+
 echo "=== All eval gate tests passed ==="

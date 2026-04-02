@@ -152,6 +152,26 @@ if [[ -n "$CHANGED_FILES" ]]; then
             if [[ -z "$BOUNDARY_RESULTS_PATH" ]]; then
               BOUNDARY_RESULTS_PATH="$(dirname "$RUN_MANIFEST")/boundary-results.json"
             fi
+            # Canonicalize paths to prevent traversal bypass
+            CANONICAL_RUN_DIR="$(cd "$(dirname "$RUN_MANIFEST")" && pwd -P)"
+            if [[ -e "$BOUNDARY_RESULTS_PATH" ]]; then
+              CANONICAL_BR_DIR="$(cd "$(dirname "$BOUNDARY_RESULTS_PATH")" && pwd -P)"
+              CANONICAL_BR_PATH="$CANONICAL_BR_DIR/$(basename "$BOUNDARY_RESULTS_PATH")"
+            else
+              BR_PARENT="$(dirname "$BOUNDARY_RESULTS_PATH")"
+              if [[ -d "$BR_PARENT" ]]; then
+                CANONICAL_BR_DIR="$(cd "$BR_PARENT" && pwd -P)"
+                CANONICAL_BR_PATH="$CANONICAL_BR_DIR/$(basename "$BOUNDARY_RESULTS_PATH")"
+              else
+                CANONICAL_BR_PATH="$BOUNDARY_RESULTS_PATH"
+              fi
+            fi
+            case "$CANONICAL_BR_PATH" in
+              "$CANONICAL_RUN_DIR"/*) ;;
+              *)
+                FAILURES+=("boundary-results.json path ($BOUNDARY_RESULTS_PATH) is outside run directory ($CANONICAL_RUN_DIR)")
+                ;;
+            esac
 
             if [[ ! -f "$BOUNDARY_RESULTS_PATH" ]]; then
               FAILURES+=("boundary-results.json not found at $BOUNDARY_RESULTS_PATH")

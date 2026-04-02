@@ -89,7 +89,7 @@ EVALEOF
 chmod +x "$TEMP_CAP_DIR/always-fail.sh"
 
 FAIL_EXIT=0
-PROJECT_DIR="$TEMP_EVAL_DIR" bash "$RUNNER" >/dev/null 2>&1 || FAIL_EXIT=$?
+EVAL_RUNNER_ACTIVE=1 PROJECT_DIR="$TEMP_EVAL_DIR" bash "$RUNNER" >/dev/null 2>&1 || FAIL_EXIT=$?
 if [[ "$FAIL_EXIT" -ne 0 ]]; then
   pass "eval-runner exits non-zero when FAIL eval exists"
 else
@@ -118,7 +118,7 @@ chmod +x "$TEMP_CAP_DIR/exit-nonzero-pass-json.sh"
 
 NONZERO_JSON=""
 NONZERO_EXIT=0
-NONZERO_JSON="$(PROJECT_DIR="$TEMP_EVAL_DIR" bash "$RUNNER" 2>/dev/null)" || NONZERO_EXIT=$?
+NONZERO_JSON="$(EVAL_RUNNER_ACTIVE=1 PROJECT_DIR="$TEMP_EVAL_DIR" bash "$RUNNER" 2>/dev/null)" || NONZERO_EXIT=$?
 if [[ "$NONZERO_EXIT" -ne 0 ]] \
   && echo "$NONZERO_JSON" | jq -e '.summary.fail == 1 and .summary.pass == 0 and .evals[0].status == "FAIL" and .evals[0].detail == "eval exited with code 42"' >/dev/null 2>&1; then
   pass "eval-runner marks non-zero exit as FAIL even when eval prints PASS JSON"

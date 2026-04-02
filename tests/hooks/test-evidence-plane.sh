@@ -55,7 +55,7 @@ else
 fi
 
 # Test 7: eval-runner produces manifest
-EVAL_OUTPUT="$(bash "$PROJECT_DIR/hooks/scripts/eval-runner.sh" 2>/dev/null || true)"
+EVAL_OUTPUT="$(EVAL_RUNNER_ACTIVE=1 bash "$PROJECT_DIR/hooks/scripts/eval-runner.sh" 2>/dev/null || true)"
 # Find latest run directory
 LATEST_RUN="$(ls -td "$PROJECT_DIR/artifacts/runs/"*/ 2>/dev/null | head -1)"
 if [[ -n "$LATEST_RUN" ]] && [[ -f "${LATEST_RUN}manifest.json" ]]; then
@@ -103,13 +103,18 @@ chmod +x "$TEMP_PROJECT/bin/mv"
 MANIFEST_STDOUT="$TEMP_PROJECT/manifest-stdout.log"
 MANIFEST_STDERR="$TEMP_PROJECT/manifest-stderr.log"
 set +e
-PATH="$TEMP_PROJECT/bin:$PATH" PROJECT_DIR="$TEMP_PROJECT" bash "$PROJECT_DIR/hooks/scripts/eval-runner.sh" >"$MANIFEST_STDOUT" 2>"$MANIFEST_STDERR"
+PATH="$TEMP_PROJECT/bin:$PATH" EVAL_RUNNER_ACTIVE=1 PROJECT_DIR="$TEMP_PROJECT" bash "$PROJECT_DIR/hooks/scripts/eval-runner.sh" >"$MANIFEST_STDOUT" 2>"$MANIFEST_STDERR"
 MANIFEST_EXIT=$?
 set -e
 if [[ "$MANIFEST_EXIT" == "2" ]] && grep -q "ERROR: failed to rename manifest" "$MANIFEST_STDERR"; then
   echo "PASS: eval-runner exits non-zero when manifest rename fails"
 else
   echo "FAIL: eval-runner did not fail closed on manifest rename error"; exit 1
+fi
+if [[ ! -f "$TEMP_PROJECT/.claude/current-run.json" ]]; then
+  echo "PASS: eval-runner does not write current-run.json when manifest rename fails"
+else
+  echo "FAIL: current-run.json should not be written when manifest rename fails"; exit 1
 fi
 
 rm -rf "$TMPLOG"
@@ -197,7 +202,7 @@ BR_STDOUT="$TEMP_PROJECT_BR/boundary-stdout.log"
 BR_STDERR="$TEMP_PROJECT_BR/boundary-stderr.log"
 BR_MV_COUNT="$TEMP_PROJECT_BR/mv-count"
 set +e
-PATH="$TEMP_PROJECT_BR/bin:$PATH" MV_COUNT_FILE="$BR_MV_COUNT" PROJECT_DIR="$TEMP_PROJECT_BR" bash "$PROJECT_DIR/hooks/scripts/eval-runner.sh" >"$BR_STDOUT" 2>"$BR_STDERR"
+PATH="$TEMP_PROJECT_BR/bin:$PATH" MV_COUNT_FILE="$BR_MV_COUNT" EVAL_RUNNER_ACTIVE=1 PROJECT_DIR="$TEMP_PROJECT_BR" bash "$PROJECT_DIR/hooks/scripts/eval-runner.sh" >"$BR_STDOUT" 2>"$BR_STDERR"
 BR_EXIT=$?
 set -e
 if [[ "$BR_EXIT" == "2" ]] && grep -q "ERROR: failed to rename boundary-results.json" "$BR_STDERR" && [[ ! -f "$TEMP_PROJECT_BR/.claude/current-run.json" ]]; then
