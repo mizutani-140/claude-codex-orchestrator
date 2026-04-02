@@ -1,3 +1,12 @@
+## Session: 2026-04-02 18:26
+### Completed
+- First-class boundary-results.json. eval-runner generates per-run boundary evidence. codex-eval-gate reads boundary-results.json only (no manifest regex, no model-report). boundary_tests_run removed from codex-implement.sh prompt. Full wrapper-owned provenance chain.
+### Next
+- Wire reject-prose-only into gate. Continue p2-module-ablation or p2-harness-branching.
+### Blockers
+- None
+---
+
 ## Session: 2026-04-02 15:28
 ### Completed
 - All 6 handoff priorities completed. 1) Regressions confirmed green (were not reproducing). 2) Full suite verified. 3) review-compiler integrated into live gate flow with session-scoped open-issues.json. 4) deferral-adjudicator: worker deferrals require operator approval. 5) resolution-ledger: per-blocker tracking with evidence/adjudication. 6) prose-only-retry-guard: rejects unchanged-diff retries. vitest 17/17, hook tests all PASS, eval 4/4, health 53ok/0warn/0fail.
