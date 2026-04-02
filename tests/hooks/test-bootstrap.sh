@@ -43,4 +43,32 @@ else
   exit 1
 fi
 
+# Test: init.sh checks jq prerequisite
+if grep -q 'prereq.*jq\|jq.*prereq' "$PROJECT_DIR/hooks/scripts/init.sh"; then
+  echo "PASS: init.sh checks jq"
+else
+  echo "FAIL: init.sh does not check jq"; exit 1
+fi
+
+# Test: init.sh checks git repo
+if grep -q 'rev-parse.*show-toplevel\|prereq-git-repo' "$PROJECT_DIR/hooks/scripts/init.sh"; then
+  echo "PASS: init.sh checks git repo"
+else
+  echo "FAIL: init.sh does not check git repo"; exit 1
+fi
+
+# Test: init.sh checks codex version
+if grep -q 'codex.*version\|prereq-codex' "$PROJECT_DIR/hooks/scripts/init.sh"; then
+  echo "PASS: init.sh checks codex"
+else
+  echo "FAIL: init.sh does not check codex"; exit 1
+fi
+
+# Test: init.sh checks codex login status
+if grep -q 'codex login.*status\|prereq-codex-auth' "$PROJECT_DIR/hooks/scripts/init.sh"; then
+  echo "PASS: init.sh checks codex auth"
+else
+  echo "FAIL: init.sh does not check codex auth"; exit 1
+fi
+
 echo "=== All bootstrap tests passed ==="
