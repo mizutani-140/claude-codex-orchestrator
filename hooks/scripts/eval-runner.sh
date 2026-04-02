@@ -206,7 +206,15 @@ BOUNDARY_RESULTS="$(jq '{
     log_sha256: .evidence.log_sha256
   }]
 }' "$MANIFEST_PATH")"
-printf '%s\n' "$BOUNDARY_RESULTS" > "$RUN_DIR/boundary-results.json" 2>/dev/null || true
+BR_TMP="$RUN_DIR/boundary-results.json.tmp.$$"
+if ! printf '%s\n' "$BOUNDARY_RESULTS" > "$BR_TMP"; then
+  echo "ERROR: failed to write boundary-results.json" >&2
+  exit 2
+fi
+if ! mv "$BR_TMP" "$RUN_DIR/boundary-results.json"; then
+  echo "ERROR: failed to rename boundary-results.json" >&2
+  exit 2
+fi
 
 # Write current-run pointer for eval gate (session-scoped)
 CURRENT_RUN_FILE="$PROJECT_DIR/.claude/current-run.json"

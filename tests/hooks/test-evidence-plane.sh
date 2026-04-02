@@ -154,4 +154,58 @@ else
   echo "FAIL: current-run.json missing boundary_results_path field"; exit 1
 fi
 
+# Test 14: boundary-results.json run_id matches manifest run_id
+if [[ -f "${LATEST_RUN}boundary-results.json" ]]; then
+  BR_RUN_ID="$(jq -r '.run_id' "${LATEST_RUN}boundary-results.json")"
+  MANIFEST_RUN_ID="$(jq -r '.run_id' "${LATEST_RUN}manifest.json")"
+  if [[ "$BR_RUN_ID" == "$MANIFEST_RUN_ID" ]] && [[ -n "$BR_RUN_ID" ]] && [[ "$BR_RUN_ID" != "null" ]]; then
+    echo "PASS: boundary-results.json run_id matches manifest run_id"
+  else
+    echo "FAIL: boundary-results.json run_id ($BR_RUN_ID) does not match manifest ($MANIFEST_RUN_ID)"; exit 1
+  fi
+else
+  echo "FAIL: boundary-results.json not found for run_id verification"; exit 1
+fi
+
+# Test 15: eval-runner fails closed if boundary-results rename fails
+TEMP_PROJECT_BR="$(mktemp -d)"
+mkdir -p "$TEMP_PROJECT_BR/evals/capability" "$TEMP_PROJECT_BR/bin"
+cat > "$TEMP_PROJECT_BR/evals/capability/pass-eval.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' '{"name":"integration-test","category":"capability","status":"PASS"}'
+EOF
+chmod +x "$TEMP_PROJECT_BR/evals/capability/pass-eval.sh"
+cat > "$TEMP_PROJECT_BR/bin/mv" <<'EOF'
+#!/usr/bin/env bash
+COUNT_FILE="${MV_COUNT_FILE:?}"
+COUNT=0
+if [[ -f "$COUNT_FILE" ]]; then
+  COUNT="$(cat "$COUNT_FILE")"
+fi
+COUNT=$((COUNT + 1))
+printf '%s\n' "$COUNT" > "$COUNT_FILE"
+if [[ "$COUNT" == "2" ]]; then
+  echo "stub mv failure on second rename: $*" >&2
+  exit 1
+fi
+/bin/mv "$@"
+EOF
+chmod +x "$TEMP_PROJECT_BR/bin/mv"
+
+BR_STDOUT="$TEMP_PROJECT_BR/boundary-stdout.log"
+BR_STDERR="$TEMP_PROJECT_BR/boundary-stderr.log"
+BR_MV_COUNT="$TEMP_PROJECT_BR/mv-count"
+set +e
+PATH="$TEMP_PROJECT_BR/bin:$PATH" MV_COUNT_FILE="$BR_MV_COUNT" PROJECT_DIR="$TEMP_PROJECT_BR" bash "$PROJECT_DIR/hooks/scripts/eval-runner.sh" >"$BR_STDOUT" 2>"$BR_STDERR"
+BR_EXIT=$?
+set -e
+if [[ "$BR_EXIT" == "2" ]] && grep -q "ERROR: failed to rename boundary-results.json" "$BR_STDERR" && [[ ! -f "$TEMP_PROJECT_BR/.claude/current-run.json" ]]; then
+  echo "PASS: eval-runner exits non-zero when boundary-results rename fails"
+else
+  echo "FAIL: eval-runner did not fail closed on boundary-results rename error"; exit 1
+fi
+
+rm -rf "$TEMP_PROJECT_BR"
+
 echo "=== All evidence plane tests passed ==="

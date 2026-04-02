@@ -612,4 +612,72 @@ else
   exit 1
 fi
 
+# Test 24: boundary-results.json run_id mismatch -> FAIL
+TEST_DIR_BRID="$TMPDIR_BASE/test-br-runid"
+mkdir -p "$TEST_DIR_BRID/.claude" "$TEST_DIR_BRID/artifacts/runs/run-brid"
+cd "$TEST_DIR_BRID"
+git init -q
+git config user.name "Test"
+git config user.email "test@test.com"
+touch initial.txt
+git add initial.txt
+git commit -m "init" -q
+mkdir -p src/api
+echo "baseline" > src/api/routes.ts
+git add src/api/routes.ts
+git commit -m "add routes" -q
+echo "change" > src/api/routes.ts
+REAL_RESOLVER_BAK_BRID="$TMPDIR_BASE/boundary-test-resolver.sh.brid.bak"
+cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_BRID"
+cat > "$REAL_RESOLVER" << 'RESOLVER'
+#!/usr/bin/env bash
+echo '["integration-test"]'
+RESOLVER
+chmod +x "$REAL_RESOLVER"
+echo '{"run_id":"run-brid","evals":[],"summary":{"pass":0,"fail":0}}' > "$TEST_DIR_BRID/artifacts/runs/run-brid/manifest.json"
+echo '{"run_id":"WRONG-RUN-ID","boundary_tests":[{"type":"integration-test","status":"PASS","exit_code":0,"log_sha256":"abc"}]}' > "$TEST_DIR_BRID/artifacts/runs/run-brid/boundary-results.json"
+echo '{"run_id":"run-brid","manifest_path":"'"$TEST_DIR_BRID"'/artifacts/runs/run-brid/manifest.json","boundary_results_path":"'"$TEST_DIR_BRID"'/artifacts/runs/run-brid/boundary-results.json"}' > "$TEST_DIR_BRID/.claude/current-run.json"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["pnpm test"]}' > "$TEST_DIR_BRID/.claude/last-implementation-result.json"
+OUTPUT_BRID="$(CLAUDE_PROJECT_DIR="$TEST_DIR_BRID" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
+mv "$REAL_RESOLVER_BAK_BRID" "$REAL_RESOLVER"
+if echo "$OUTPUT_BRID" | grep -q 'boundary-results.json run_id.*does not match'; then
+  echo "PASS: boundary-results.json run_id mismatch triggers FAIL"
+else
+  echo "FAIL: boundary-results.json run_id mismatch should trigger FAIL (output: $OUTPUT_BRID)"
+  exit 1
+fi
+
+# Test 25: manifest_path empty in current-run.json -> FAIL
+TEST_DIR_EMPATH="$TMPDIR_BASE/test-empty-manifest-path"
+mkdir -p "$TEST_DIR_EMPATH/.claude"
+cd "$TEST_DIR_EMPATH"
+git init -q
+git config user.name "Test"
+git config user.email "test@test.com"
+touch initial.txt
+git add initial.txt
+git commit -m "init" -q
+mkdir -p src/api
+echo "baseline" > src/api/routes.ts
+git add src/api/routes.ts
+git commit -m "add routes" -q
+echo "change" > src/api/routes.ts
+REAL_RESOLVER_BAK_EMPATH="$TMPDIR_BASE/boundary-test-resolver.sh.empath.bak"
+cp "$REAL_RESOLVER" "$REAL_RESOLVER_BAK_EMPATH"
+cat > "$REAL_RESOLVER" << 'RESOLVER'
+#!/usr/bin/env bash
+echo '["integration-test"]'
+RESOLVER
+chmod +x "$REAL_RESOLVER"
+echo '{"run_id":"run-empath","manifest_path":""}' > "$TEST_DIR_EMPATH/.claude/current-run.json"
+echo '{"status":"DONE","tests_status":"PASS","test_log":"All tests passed","changed_files":["src/api/routes.ts"],"tests_run":["pnpm test"]}' > "$TEST_DIR_EMPATH/.claude/last-implementation-result.json"
+OUTPUT_EMPATH="$(CLAUDE_PROJECT_DIR="$TEST_DIR_EMPATH" bash "$PROJECT_DIR/hooks/scripts/codex-eval-gate.sh" 2>/dev/null || true)"
+mv "$REAL_RESOLVER_BAK_EMPATH" "$REAL_RESOLVER"
+if echo "$OUTPUT_EMPATH" | grep -q 'manifest_path is empty or file does not exist'; then
+  echo "PASS: empty manifest_path in current-run.json triggers FAIL"
+else
+  echo "FAIL: empty manifest_path should trigger FAIL (output: $OUTPUT_EMPATH)"
+  exit 1
+fi
+
 echo "=== All eval gate tests passed ==="
