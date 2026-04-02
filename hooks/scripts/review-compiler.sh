@@ -36,8 +36,9 @@ if ! echo "$REVIEW_JSON" | jq -e '.fix_instructions | type == "array"' >/dev/nul
 fi
 
 # Compile issues
+SESSION_ID="$(get_session_id 2>/dev/null || echo "")"
 TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-ISSUES="$(echo "$REVIEW_JSON" | jq --arg ts "$TIMESTAMP" '
+ISSUES="$(echo "$REVIEW_JSON" | jq --arg ts "$TIMESTAMP" --arg sid "$SESSION_ID" '
   [.blocking_issues as $issues | .fix_instructions as $fixes |
    range(0; ($issues | length)) |
    {
@@ -48,7 +49,8 @@ ISSUES="$(echo "$REVIEW_JSON" | jq --arg ts "$TIMESTAMP" '
      fix_instruction: ($fixes[.] // "No fix instruction provided"),
      status: "open",
      evidence_required: true,
-     compiled_at: $ts
+     compiled_at: $ts,
+     session_id: $sid
    }]
 ')"
 

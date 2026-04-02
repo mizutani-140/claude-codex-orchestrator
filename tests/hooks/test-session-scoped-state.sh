@@ -188,4 +188,44 @@ else
   exit 1
 fi
 
+# Test: architecture gate PASS invalidates legacy open-issues.json
+LEAK_TEST_DIR="$TMPDIR_BASE/leak-test"
+mkdir -p "$LEAK_TEST_DIR/.claude/sessions/leak-session" "$LEAK_TEST_DIR/hooks/scripts"
+cp "$PROJECT_DIR/hooks/scripts/codex-architecture-gate.sh" "$LEAK_TEST_DIR/hooks/scripts/"
+cp "$SESSION_UTIL" "$LEAK_TEST_DIR/hooks/scripts/"
+cat > "$LEAK_TEST_DIR/hooks/scripts/codex-adversarial-review.sh" <<'STUB_EOF'
+#!/usr/bin/env bash
+printf '%s\n' '{"status":"PASS","summary":"all clear","blocking_issues":[],"fix_instructions":[]}'
+STUB_EOF
+chmod +x "$LEAK_TEST_DIR/hooks/scripts/codex-adversarial-review.sh"
+printf 'leak-session' > "$LEAK_TEST_DIR/.claude/current-session"
+cat > "$LEAK_TEST_DIR/.claude/sessions/leak-session/session.json" <<'STUB_EOF'
+{"base_commit":""}
+STUB_EOF
+
+echo '[{"id":"stale","severity":"blocking","status":"open"}]' > "$LEAK_TEST_DIR/.claude/open-issues.json"
+
+(
+  cd "$LEAK_TEST_DIR"
+  git init -q
+  git config user.name "Test User"
+  git config user.email "test@example.com"
+  printf 'one\n' > file1.sh
+  printf 'two\n' > file2.sh
+  printf 'three\n' > file3.sh
+  git add file1.sh file2.sh file3.sh
+  git commit -m "init" -q
+  printf 'delta\n' >> file1.sh
+  printf 'delta\n' >> file2.sh
+  printf 'delta\n' >> file3.sh
+  printf '{"stop_hook_active":false}\n' | CLAUDE_PROJECT_DIR="$LEAK_TEST_DIR" bash hooks/scripts/codex-architecture-gate.sh >/dev/null 2>&1 || true
+)
+
+if [[ -f "$LEAK_TEST_DIR/.claude/open-issues.json" ]]; then
+  echo "FAIL: legacy open-issues.json should be deleted after PASS"
+  exit 1
+else
+  echo "PASS: legacy open-issues.json invalidated after architecture gate PASS"
+fi
+
 echo "=== All session scoped state tests passed ==="

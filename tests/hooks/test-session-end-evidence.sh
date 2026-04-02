@@ -18,6 +18,8 @@ setup_test_env() {
   touch claude-progress.txt
   printf 'test-sess' > "$dir/.claude/current-session"
   cp "$PROJECT_DIR/hooks/scripts/session-end.sh" "$dir/"
+  cp "$PROJECT_DIR/hooks/scripts/record-session.sh" "$dir/"
+  cp "$PROJECT_DIR/hooks/scripts/promote-feature.sh" "$dir/"
   cp "$PROJECT_DIR/hooks/scripts/session-util.sh" "$dir/"
 }
 

@@ -143,8 +143,8 @@
     {
       "id": "p2-deferral-adjudicator",
       "title": "Separate defer/phase/risk authority from worker execution",
-      "status": "pending",
-      "passes": false,
+      "status": "done",
+      "passes": true,
       "acceptance": "Worker cannot directly set deferred/accepted-risk on blockers. Defer requests are structured JSON resolved by separate adjudication path.",
       "depends_on": [
         "p2-review-compiler"

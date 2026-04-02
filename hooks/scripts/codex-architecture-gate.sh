@@ -72,6 +72,8 @@ read_state_field() {
 
 reset_state() {
   init_state
+  # Clean up stale open-issues on reset
+  rm -f "$STATE_DIR/open-issues.json"
 }
 
 json_block() {
@@ -239,6 +241,8 @@ if [[ "$FAST_PATH" == "true" ]]; then
     cp "$REVIEW_FILE" "$LEGACY_REVIEW_FILE" 2>/dev/null || true
   fi
   write_state "$DIFF_HASH" "$REVIEW_ROUND" "$MAX_REVIEW_ROUNDS" "PASS" "Fast path: small or docs-only change" "$DIFF_FILES"
+  # Invalidate legacy open-issues.json on PASS
+  rm -f "$STATE_DIR/open-issues.json"
   exit 0
 fi
 
@@ -260,6 +264,8 @@ fi
 
 if [[ "$REVIEW_STATUS" == "PASS" ]]; then
   write_state "$DIFF_HASH" "$REVIEW_ROUND" "$MAX_REVIEW_ROUNDS" "PASS" "$REVIEW_SUMMARY" "$DIFF_FILES"
+  # Invalidate legacy open-issues.json on PASS to prevent cross-session leakage
+  rm -f "$STATE_DIR/open-issues.json"
   exit 0
 fi
 

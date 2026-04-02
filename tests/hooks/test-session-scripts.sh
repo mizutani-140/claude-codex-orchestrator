@@ -24,6 +24,9 @@ fi
 TEST_DIR="$TMPDIR_BASE/test-end"
 mkdir -p "$TEST_DIR"
 cp "$PROJECT_DIR/hooks/scripts/session-end.sh" "$TEST_DIR/"
+cp "$PROJECT_DIR/hooks/scripts/record-session.sh" "$TEST_DIR/"
+cp "$PROJECT_DIR/hooks/scripts/promote-feature.sh" "$TEST_DIR/"
+cp "$PROJECT_DIR/hooks/scripts/session-util.sh" "$TEST_DIR/"
 cd "$TEST_DIR"
 git init -q
 git config user.name "Test User"
@@ -53,6 +56,13 @@ if command -v jq >/dev/null 2>&1; then
   echo '{"version":1,"features":[{"id":"test","title":"t","status":"pending","passes":false,"acceptance":"x"}]}' > feature-list.json
   git add feature-list.json
   git commit -m "reset feature list" -q
+
+  mkdir -p .claude/sessions/test-sess
+  printf 'test-sess' > .claude/current-session
+  echo '{"status":"PASS"}' > .claude/sessions/test-sess/eval-gate.json
+  echo '{"status":"PASS"}' > .claude/sessions/test-sess/architecture-review.json
+  git add .claude/current-session .claude/sessions/test-sess/eval-gate.json .claude/sessions/test-sess/architecture-review.json
+  git commit -m "add session gate artifacts" -q
 
   bash session-end.sh "Finished stuff" "Nothing" "None" "test" "success" "8 tests passed"
 

@@ -76,11 +76,11 @@ else
   FAIL_COUNT=$((FAIL_COUNT + 1))
 fi
 
-# Check that session-end.sh uses read_session_or_legacy for legacy reads
-if grep -q 'read_session_or_legacy' "$PROJECT_DIR/hooks/scripts/session-end.sh"; then
-  echo "PASS: session-end.sh uses read_session_or_legacy"
+# Check that promote-feature.sh uses read_session_or_legacy for legacy reads
+if grep -q 'read_session_or_legacy' "$PROJECT_DIR/hooks/scripts/promote-feature.sh"; then
+  echo "PASS: promote-feature.sh uses read_session_or_legacy"
 else
-  echo "FAIL: session-end.sh does not use read_session_or_legacy"
+  echo "FAIL: promote-feature.sh does not use read_session_or_legacy"
   FAIL_COUNT=$((FAIL_COUNT + 1))
 fi
 
