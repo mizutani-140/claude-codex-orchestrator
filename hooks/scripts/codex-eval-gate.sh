@@ -123,38 +123,50 @@ if [[ -n "$CHANGED_FILES" ]]; then
       if [[ ! -f "$CURRENT_RUN_FILE" ]]; then
         FAILURES+=("No current-run evidence: .claude/current-run.json missing. Run eval-runner.sh first.")
       else
+        RUN_ID="$(jq -r '.run_id // empty' "$CURRENT_RUN_FILE" 2>/dev/null || echo "")"
         RUN_MANIFEST="$(jq -r '.manifest_path // empty' "$CURRENT_RUN_FILE" 2>/dev/null || echo "")"
-        if [[ -z "$RUN_MANIFEST" ]] || [[ ! -f "$RUN_MANIFEST" ]]; then
-          FAILURES+=("Current-run manifest not found: ${RUN_MANIFEST:-<empty>}")
-        else
-          # Validate manifest is from current session (not stale)
-          RUN_ID="$(jq -r '.run_id // empty' "$CURRENT_RUN_FILE" 2>/dev/null || echo "")"
+        
+        # Validate run_id matches manifest
+        PRIOR_FAILURE_COUNT=${#FAILURES[@]}
+        if [[ -n "$RUN_MANIFEST" ]] && [[ -f "$RUN_MANIFEST" ]]; then
           MANIFEST_RUN_ID="$(jq -r '.run_id // empty' "$RUN_MANIFEST" 2>/dev/null || echo "")"
           if [[ "$RUN_ID" != "$MANIFEST_RUN_ID" ]]; then
             FAILURES+=("Current-run pointer (${RUN_ID}) does not match manifest (${MANIFEST_RUN_ID})")
+          fi
+        fi
+        
+        # Validate session
+        POINTER_SESSION="$(jq -r '.session_id // empty' "$CURRENT_RUN_FILE" 2>/dev/null || echo "")"
+        CURRENT_SESSION=""
+        if [[ -f "$PROJECT_DIR/.claude/current-session" ]]; then
+          CURRENT_SESSION="$(head -n 1 "$PROJECT_DIR/.claude/current-session" | tr -d '\r\n')"
+        fi
+        if [[ -n "$POINTER_SESSION" ]] && [[ -n "$CURRENT_SESSION" ]] && [[ "$POINTER_SESSION" != "$CURRENT_SESSION" ]]; then
+          FAILURES+=("Current-run session (${POINTER_SESSION}) does not match active session (${CURRENT_SESSION})")
+        fi
+        
+        # If validation passed, check boundary-results.json
+        if [[ ${#FAILURES[@]} -eq $PRIOR_FAILURE_COUNT ]]; then
+          # Read boundary-results.json from current run
+          BOUNDARY_RESULTS_PATH="$(jq -r '.boundary_results_path // empty' "$CURRENT_RUN_FILE" 2>/dev/null || echo "")"
+          if [[ -z "$BOUNDARY_RESULTS_PATH" ]]; then
+            # Fallback: derive from manifest path
+            BOUNDARY_RESULTS_PATH="$(dirname "$RUN_MANIFEST")/boundary-results.json"
+          fi
+          
+          if [[ ! -f "$BOUNDARY_RESULTS_PATH" ]]; then
+            FAILURES+=("boundary-results.json not found at $BOUNDARY_RESULTS_PATH")
           else
-            # Validate session_id matches current session (prevent cross-session contamination)
-            POINTER_SESSION="$(jq -r '.session_id // empty' "$CURRENT_RUN_FILE" 2>/dev/null || echo "")"
-            CURRENT_SESSION=""
-            if [[ -f "$PROJECT_DIR/.claude/current-session" ]]; then
-              CURRENT_SESSION="$(head -n 1 "$PROJECT_DIR/.claude/current-session" | tr -d '\r\n')"
-            fi
-            # Only reject if BOTH sides have a session_id and they differ
-            if [[ -n "$POINTER_SESSION" ]] && [[ -n "$CURRENT_SESSION" ]] && [[ "$POINTER_SESSION" != "$CURRENT_SESSION" ]]; then
-              FAILURES+=("Current-run session (${POINTER_SESSION}) does not match active session (${CURRENT_SESSION})")
-            else
-              # Extract boundary types from passing evals with exit_code 0
-              MANIFEST_BOUNDARY="$(jq '[.evals[] | select(.status == "PASS" and .evidence.exit_code == 0) | .name] | map(select(test("boundary|contract|integration|security|smoke")))' "$RUN_MANIFEST" 2>/dev/null || echo "[]")"
-              
-              MISSING_BOUNDARY=""
-              for bt in $(echo "$REQUIRED_BOUNDARY" | jq -r '.[]' 2>/dev/null); do
-                if ! echo "$MANIFEST_BOUNDARY" | jq -e --arg bt "$bt" 'any(.[]; . == $bt or (. | test($bt)))' >/dev/null 2>&1; then
-                  MISSING_BOUNDARY="$MISSING_BOUNDARY $bt"
-                fi
-              done
-              if [[ -n "${MISSING_BOUNDARY// }" ]]; then
-                FAILURES+=("Required boundary tests not run:$MISSING_BOUNDARY (source: manifest run $RUN_ID)")
+            # Exact match: check each required boundary type has status PASS and exit_code 0
+            MISSING_BOUNDARY=""
+            for bt in $(echo "$REQUIRED_BOUNDARY" | jq -r '.[]' 2>/dev/null); do
+              FOUND="$(jq --arg bt "$bt" '[.boundary_tests[] | select(.type | test($bt)) | select(.status == "PASS" and .exit_code == 0)] | length' "$BOUNDARY_RESULTS_PATH" 2>/dev/null || echo "0")"
+              if [[ "$FOUND" -eq 0 ]]; then
+                MISSING_BOUNDARY="$MISSING_BOUNDARY $bt"
               fi
+            done
+            if [[ -n "${MISSING_BOUNDARY// }" ]]; then
+              FAILURES+=("Required boundary tests not passed:$MISSING_BOUNDARY (source: boundary-results.json run $RUN_ID)")
             fi
           fi
         fi

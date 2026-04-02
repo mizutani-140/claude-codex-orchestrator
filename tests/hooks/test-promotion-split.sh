@@ -118,6 +118,24 @@ else
   exit 1
 fi
 
+TEST6="$TMPDIR_BASE/test6"
+mkdir -p "$TEST6"
+setup_test_env "$TEST6"
+cd "$TEST6"
+echo '{"status":"PASS"}' > "$TEST6/.claude/sessions/test-sess/eval-gate.json"
+echo '{"status":"PASS"}' > "$TEST6/.claude/sessions/test-sess/architecture-review.json"
+mkdir -p "$TEST6/.claude"
+printf '[{"id":"B1","severity":"blocker"}]\n' > "$TEST6/.claude/open-issues.json"
+printf '[]\n' > "$TEST6/.claude/resolution-ledger.json"
+WARNING_OUTPUT="$(bash promote-feature.sh "feat1" "success" "8 tests passed" 2>&1 >/dev/null)"
+STATUS="$(jq -r '.features[0].status' feature-list.json)"
+if [[ "$STATUS" == "done" ]] && grep -q "WARNING: 1 unresolved blocker(s) in open-issues.json" <<<"$WARNING_OUTPUT"; then
+  echo "PASS: promote-feature.sh warns on unresolved blockers without blocking promotion"
+else
+  echo "FAIL: expected unresolved blocker warning without blocking promotion"
+  exit 1
+fi
+
 # Test: promote-feature fails closed when session-util.sh is missing
 TEST_FAILCLOSE="$TMPDIR_BASE/test-failclose"
 mkdir -p "$TEST_FAILCLOSE"

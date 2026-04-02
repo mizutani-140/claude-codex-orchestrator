@@ -89,8 +89,6 @@ TDD WORKFLOW (mandatory for new features, recommended for bug fixes):
 BOUNDARY TESTS:
 If .claude/last-sprint-contract.json exists, read it and run any boundary_tests_required.
 Boundary test types: contract-test, integration-test, api-contract-test, security-regression-test, smoke-test.
-After running boundary tests, list the EXACT boundary test type IDs in the boundary_tests_run field.
-Only include types you actually executed and that passed.
 
 CRITICAL CONSTRAINTS:
 - You MUST run tests before reporting status as DONE.
@@ -110,7 +108,6 @@ Return JSON only. No markdown fences. Use exactly this schema:
   "tests_run": ["cmd1", "cmd2"],
   "tests_status": "PASS|FAIL|NOT_RUN",
   "test_log": "first 200 lines of actual test stdout+stderr including RED phase evidence",
-  "boundary_tests_run": ["integration-test", "contract-test"],
   "remaining_risks": ["..."]
 }
 

@@ -196,6 +196,18 @@ if ! mv "$MANIFEST_TMP" "$MANIFEST_PATH"; then
   exit 2
 fi
 
+# Write boundary-results.json (extracted from manifest for gate consumption)
+BOUNDARY_RESULTS="$(jq '{
+  run_id: .run_id,
+  boundary_tests: [.evals[] | select(.name | test("boundary|contract|integration|security|smoke")) | {
+    type: .name,
+    status: .status,
+    exit_code: .evidence.exit_code,
+    log_sha256: .evidence.log_sha256
+  }]
+}' "$MANIFEST_PATH")"
+printf '%s\n' "$BOUNDARY_RESULTS" > "$RUN_DIR/boundary-results.json" 2>/dev/null || true
+
 # Write current-run pointer for eval gate (session-scoped)
 CURRENT_RUN_FILE="$PROJECT_DIR/.claude/current-run.json"
 mkdir -p "$PROJECT_DIR/.claude"
@@ -207,8 +219,9 @@ fi
 RUN_POINTER="$(jq -cn \
   --arg run_id "$RUN_ID" \
   --arg manifest_path "$MANIFEST_PATH" \
+  --arg boundary_results_path "$RUN_DIR/boundary-results.json" \
   --arg session_id "$CURRENT_SESSION_ID" \
-  '{run_id: $run_id, manifest_path: $manifest_path, session_id: $session_id}')"
+  '{run_id: $run_id, manifest_path: $manifest_path, boundary_results_path: $boundary_results_path, session_id: $session_id}')"
 printf '%s\n' "$RUN_POINTER" > "${CURRENT_RUN_FILE}.tmp.$$" && mv "${CURRENT_RUN_FILE}.tmp.$$" "$CURRENT_RUN_FILE" || {
   echo "ERROR: failed to write current-run.json" >&2
   exit 2

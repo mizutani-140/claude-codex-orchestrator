@@ -136,4 +136,22 @@ else
   echo "FAIL: eval-runner did not write current-run.json"; exit 1
 fi
 
+# Test 12: eval-runner produces boundary-results.json
+if [[ -f "${LATEST_RUN}boundary-results.json" ]]; then
+  if jq -e '.run_id and .boundary_tests' "${LATEST_RUN}boundary-results.json" >/dev/null 2>&1; then
+    echo "PASS: boundary-results.json has required fields"
+  else
+    echo "FAIL: boundary-results.json missing required fields"; exit 1
+  fi
+else
+  echo "FAIL: boundary-results.json not found in run directory"; exit 1
+fi
+
+# Test 13: current-run.json includes boundary_results_path
+if jq -e 'has("boundary_results_path")' "$CURRENT_RUN_FILE" >/dev/null 2>&1; then
+  echo "PASS: current-run.json includes boundary_results_path field"
+else
+  echo "FAIL: current-run.json missing boundary_results_path field"; exit 1
+fi
+
 echo "=== All evidence plane tests passed ==="
