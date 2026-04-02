@@ -75,4 +75,36 @@ else
   echo "FAIL: expected 0, got $EMPTY_COUNT"; exit 1
 fi
 
+# Test 9b: compiler writes to session dir when session is active
+SESS_TEST_DIR="$(mktemp -d)"
+SESS_ID="test-session-$$"
+mkdir -p "$SESS_TEST_DIR/.claude/sessions/$SESS_ID"
+echo "$SESS_ID" > "$SESS_TEST_DIR/.claude/current-session"
+echo "$VALID_REVIEW" | CLAUDE_PROJECT_DIR="$SESS_TEST_DIR" bash "$COMPILER" >/dev/null 2>&1
+if [[ -f "$SESS_TEST_DIR/.claude/sessions/$SESS_ID/open-issues.json" ]]; then
+  echo "PASS: writes to session-scoped path"
+else
+  echo "FAIL: did not write to session-scoped path"; exit 1
+fi
+if [[ -f "$SESS_TEST_DIR/.claude/open-issues.json" ]]; then
+  echo "PASS: legacy copy also written"
+else
+  echo "FAIL: legacy copy not written"; exit 1
+fi
+rm -rf "$SESS_TEST_DIR"
+
+# Test 10: architecture gate calls review-compiler on FAIL
+if grep -q 'review-compiler.sh' "$PROJECT_DIR/hooks/scripts/codex-architecture-gate.sh"; then
+  echo "PASS: architecture gate integrates review-compiler"
+else
+  echo "FAIL: architecture gate does not call review-compiler"; exit 1
+fi
+
+# Test 11: gate messages reference open-issues.json
+if grep -q 'open-issues.json' "$PROJECT_DIR/hooks/scripts/codex-architecture-gate.sh"; then
+  echo "PASS: gate messages reference open-issues.json"
+else
+  echo "FAIL: gate messages still reference raw review"; exit 1
+fi
+
 echo "=== All review compiler tests passed ==="

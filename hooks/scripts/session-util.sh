@@ -26,6 +26,7 @@ _legacy_session_name() {
     eval-gate.json) printf '%s\n' "last-eval-gate.json" ;;
     review-gate-state.json) printf '%s\n' "review-gate-state.json" ;;
     plan-critique.json) printf '%s\n' "last-plan-critique.json" ;;
+    open-issues.json) printf '%s\n' "open-issues.json" ;;
     *) printf '%s\n' "$1" ;;
   esac
 }

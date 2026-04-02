@@ -206,7 +206,7 @@ fi
 # 同一 diff に対して既に FAIL 済みなら、同じ review を再実行せず block のみ返す
 if [[ "$DIFF_HASH" == "$ACTIVE_HASH" && "$LAST_STATUS" == "FAIL" ]]; then
   SUMMARY="${LAST_SUMMARY:-Architecture gate failed.}"
-  json_block "Architecture gate: FAIL（再実行待ち）。\n理由: $SUMMARY\n\n手順:\n1. .claude/last-adversarial-review.json を読む\n2. codex-executor で最小修正を Codex に委任する\n3. 修正後、再度完了を試みる"
+  json_block "Architecture gate: FAIL（再実行待ち）。\n理由: $SUMMARY\n\n手順:\n1. open-issues.json を読む（session dir または .claude/）\n2. codex-executor で最小修正を Codex に委任する\n3. 修正後、再度完了を試みる"
   exit 0
 fi
 
@@ -250,6 +250,14 @@ fi
 REVIEW_STATUS="$(echo "$REVIEW_JSON" | jq -r '.status // "ERROR"')"
 REVIEW_SUMMARY="$(echo "$REVIEW_JSON" | jq -r '.summary // "No summary provided"')"
 
+# Compile review into structured issues on non-PASS
+if [[ "$REVIEW_STATUS" != "PASS" ]]; then
+  COMPILER="$PROJECT_DIR/hooks/scripts/review-compiler.sh"
+  if [[ -x "$COMPILER" ]]; then
+    echo "$REVIEW_JSON" | CLAUDE_PROJECT_DIR="$PROJECT_DIR" bash "$COMPILER" >/dev/null 2>&1 || true
+  fi
+fi
+
 if [[ "$REVIEW_STATUS" == "PASS" ]]; then
   write_state "$DIFF_HASH" "$REVIEW_ROUND" "$MAX_REVIEW_ROUNDS" "PASS" "$REVIEW_SUMMARY" "$DIFF_FILES"
   exit 0
@@ -257,12 +265,12 @@ fi
 
 if [[ "$REVIEW_ROUND" -ge "$MAX_REVIEW_ROUNDS" ]]; then
   write_state "$DIFF_HASH" "$REVIEW_ROUND" "$MAX_REVIEW_ROUNDS" "TERMINAL" "$REVIEW_SUMMARY" "$DIFF_FILES"
-  json_block "Architecture gate: 最大修正回数に到達しました（${REVIEW_ROUND}/${MAX_REVIEW_ROUNDS}）。\n理由: $REVIEW_SUMMARY\n\nこれ以上の自動修正は行わず、未解決の blocking issue と残リスクをユーザーに報告してから停止してください。参照: .claude/last-adversarial-review.json"
+  json_block "Architecture gate: 最大修正回数に到達しました（${REVIEW_ROUND}/${MAX_REVIEW_ROUNDS}）。\n理由: $REVIEW_SUMMARY\n\nこれ以上の自動修正は行わず、未解決の blocking issue と残リスクをユーザーに報告してから停止してください。参照: open-issues.json（session dir または .claude/）"
   exit 0
 fi
 
 write_state "$DIFF_HASH" "$REVIEW_ROUND" "$MAX_REVIEW_ROUNDS" "FAIL" "$REVIEW_SUMMARY" "$DIFF_FILES"
 
-REASON_TEXT="Architecture gate: FAIL（${REVIEW_ROUND}/${MAX_REVIEW_ROUNDS}）。\n\n検出理由: $(IFS=' / '; echo "${REASONS[*]}")\nCodex summary: $REVIEW_SUMMARY\n\n次の手順:\n1. .claude/last-adversarial-review.json を読む\n2. codex-executor で fix_instructions に従う最小修正を Codex に委任する\n3. relevant tests を再実行させる\n4. 修正後に再度 stop を試みる"
+REASON_TEXT="Architecture gate: FAIL（${REVIEW_ROUND}/${MAX_REVIEW_ROUNDS}）。\n\n検出理由: $(IFS=' / '; echo "${REASONS[*]}")\nCodex summary: $REVIEW_SUMMARY\n\n次の手順:\n1. open-issues.json を読む（session dir または .claude/、構造化 blocker リスト）\n2. 各 issue の fix_instruction に従い codex-executor で最小修正を委任する\n3. relevant tests を再実行させる\n4. 修正後に再度 stop を試みる"
 
 json_block "$REASON_TEXT"

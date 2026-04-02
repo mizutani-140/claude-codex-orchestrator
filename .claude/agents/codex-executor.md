@@ -93,10 +93,10 @@ maxTurns: 20
 
 ## gate block 対応
 
-`.claude/sessions/<id>/architecture-review.json`（または legacy `.claude/last-adversarial-review.json`）が存在する場合:
+session ディレクトリの `open-issues.json`（または legacy `.claude/open-issues.json`）が存在する場合:
 
 1. その JSON を読み込む
-2. `blocking_issues` と `fix_instructions` を抜き出す
+2. 各 issue の `id` と `fix_instruction` を抜き出す
 3. それを Codex implementation 用の最小修正タスクへ変換する
 4. `codex-implement.sh` に渡す
 5. 実装結果 JSON を返す
