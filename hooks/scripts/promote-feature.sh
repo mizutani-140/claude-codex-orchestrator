@@ -136,6 +136,21 @@ fi
 
 printf '%s\n' "$UPDATED" > feature-list.json
 
+# Check: all open issues must be resolved in ledger before promotion
+OPEN_ISSUES="$PROJECT_DIR/.claude/open-issues.json"
+LEDGER="$PROJECT_DIR/.claude/resolution-ledger.json"
+if [[ -f "$OPEN_ISSUES" ]] && [[ -f "$LEDGER" ]]; then
+  UNRESOLVED="$(jq --slurpfile ledger "$LEDGER" '
+    [.[] | .id as $id | select(
+      ($ledger[0] | map(select(.issue_id == $id)) | length) == 0
+    )]
+  ' "$OPEN_ISSUES")"
+  UNRESOLVED_COUNT="$(echo "$UNRESOLVED" | jq 'length')"
+  if [[ "$UNRESOLVED_COUNT" -gt 0 ]]; then
+    echo "WARNING: $UNRESOLVED_COUNT unresolved blocker(s) in open-issues.json" >&2
+  fi
+fi
+
 if [[ "$EVIDENCE_INSUFFICIENT" -eq 1 ]]; then
   exit 2
 fi

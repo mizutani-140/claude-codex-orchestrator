@@ -153,8 +153,8 @@
     {
       "id": "p2-resolution-ledger",
       "title": "Per-blocker resolution ledger",
-      "status": "pending",
-      "passes": false,
+      "status": "done",
+      "passes": true,
       "acceptance": "Every blocker ID has ledger entry. Fixed entries reference evidence artifacts. Deferred entries require adjudicator approval. Promotion fails if any unresolved.",
       "depends_on": [
         "p2-review-compiler",

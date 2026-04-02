@@ -10,6 +10,7 @@
 .claude/current-run.json
 .claude/boundary-attestation.json
 .claude/open-issues.json
+.claude/resolution-ledger.json
 .claude/session-base-commit
 .claude/sessions/
 .claude/current-session
