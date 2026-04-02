@@ -1,3 +1,12 @@
+## Session: 2026-04-02 09:48
+### Completed
+- P2 evidence plane complete. verify-run.sh wraps execution with exit_code/log/sha256. eval-runner.sh writes manifest.json to artifacts/runs/<run-id>/ with atomic rename. Artifact write failures now reported (not silent). 4 evals pass, 11 evidence plane tests pass.
+### Next
+- Boundary attestation migration: codex-eval-gate to use manifest evidence instead of model JSON. Then p2-module-ablation or p2-harness-branching.
+### Blockers
+- None
+---
+
 ## Session: 2026-04-01 22:12
 ### Completed
 - P2-1 hardened: eval-runner exits 1 on FAIL (promotion gate ready), per-eval 60s timeout with graceful degradation. P2 evals-framework now landed with proper exit semantics.
